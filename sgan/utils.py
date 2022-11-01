@@ -1,3 +1,5 @@
+import sys
+
 import os
 import time
 import torch
@@ -5,6 +7,78 @@ import numpy as np
 import inspect
 from contextlib import contextmanager
 import subprocess
+import matplotlib
+from matplotlib import pyplot as plt
+import matplotlib.lines as mlines
+import matplotlib.colors as mcolours
+
+matplotlib.use('tkagg')
+
+
+def get_cmap(n, name='hsv'):
+    """Returns a function that maps each index in 0, 1, ..., n-1 to a distinct
+    RGB color; the keyword argument name must be a standard mpl colormap name.
+    https://stackoverflow.com/a/25628397"""
+    return plt.cm.get_cmap(name, n)
+
+
+def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
+    for i, (s, e) in enumerate(seq_start_end[::, ::]):
+        # print(f'i {i}, s {s},e {e}')
+        cmap = list(mcolours.TABLEAU_COLORS.keys())
+        fig, ax = plt.subplots()
+
+        for j in range(s, e):
+            colour = cmap.pop(0)
+            l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
+                         linestyle='', marker='.')
+            # l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
+            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], c=colour, linestyle='',
+                         marker='*')
+
+        plt.title('Trajectories in relative coordinates')
+        plt.axis('square')
+        ax.set_xlabel('X [m]')
+        ax.set_ylabel('Y [m]')
+        plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
+                                 markersize=5, label='Obs_traj')
+        x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
+                               markersize=5, label='Pred_traj_gt')
+        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
+                                  markersize=5, label='Pred_traj_fake')
+        ax.legend(handles=[dot_line, x_line, star_line])
+        plt.show()
+        plt.waitforbuttonpress()
+        plt.close(fig)
+
+
+def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
+    for s, e in seq_start_end[:, :]:
+        cmap = list(mcolours.TABLEAU_COLORS.keys())
+        fig, ax = plt.subplots()
+        for j in range(s, e):
+            colour = cmap.pop(0)
+            l1 = ax.plot(obs_traj_abs[:, j, 0], obs_traj_abs[:, j, 1], c=colour, linestyle='', marker='.')
+            l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
+            l3 = ax.plot(pred_traj_fake_abs[:, j, 0], pred_traj_fake_abs[:, j, 1], c=colour, linestyle='', marker='*')
+        plt.axis('square')
+        ax.set_ylim([0,10])
+        ax.set_xlim([0,10])
+        plt.title('Trajectories in relative coordinates')
+
+        ax.set_xlabel('X [m]')
+        ax.set_ylabel('Y [m]')
+
+        plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.', markersize=5, label='Obs_traj')
+        x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
+                               markersize=5, label='Pred_traj_gt')
+        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*', markersize=5, label='Pred_traj_fake')
+
+        ax.legend(handles=[dot_line, star_line])
+        plt.savefig(f'/home/david/Pictures/plots/inference exps/{title}.png', bbox_inches='tight')
+        plt.close()
 
 
 def int_tuple(s):
@@ -38,8 +112,8 @@ def get_total_norm(parameters, norm_type=2):
         for p in parameters:
             try:
                 param_norm = p.grad.data.norm(norm_type)
-                total_norm += param_norm**norm_type
-                total_norm = total_norm**(1. / norm_type)
+                total_norm += param_norm ** norm_type
+                total_norm = total_norm ** (1. / norm_type)
             except:
                 continue
     return total_norm

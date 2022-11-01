@@ -116,4 +116,5 @@ def final_displacement_error(
     if mode == 'raw':
         return loss
     else:
+        print(f'FDE output shape: {torch.sum(loss)}')
         return torch.sum(loss)

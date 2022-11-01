@@ -20,7 +20,7 @@ from sgan.utils import int_tuple, bool_flag, get_total_norm
 from sgan.utils import relative_to_abs, get_dset_path
 
 torch.backends.cudnn.benchmark = True
-
+_DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
 FORMAT = '[%(levelname)s: %(filename)s: %(lineno)4d]: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT, stream=sys.stdout)
@@ -49,7 +49,7 @@ parser.add_argument('--mlp_dim', default=1024, type=int)
 # Generator Options
 parser.add_argument('--encoder_h_dim_g', default=64, type=int)
 parser.add_argument('--decoder_h_dim_g', default=128, type=int)
-parser.add_argument('--noise_dim', default=None, type=int_tuple)
+parser.add_argument('--noise_dim', default=(0, ), type=int_tuple)
 parser.add_argument('--noise_type', default='gaussian')
 parser.add_argument('--noise_mix_type', default='ped')
 parser.add_argument('--clipping_threshold_g', default=0, type=float)
@@ -145,7 +145,7 @@ def main(args):
         bottleneck_dim=args.bottleneck_dim,
         neighborhood_size=args.neighborhood_size,
         grid_size=args.grid_size,
-        batch_norm=args.batch_norm)
+        batch_norm=args.batch_norm).to(device=_DEVICE_)
 
     generator.apply(init_weights)
     generator.type(float_dtype).train()
@@ -161,7 +161,7 @@ def main(args):
         num_layers=args.num_layers,
         dropout=args.dropout,
         batch_norm=args.batch_norm,
-        d_type=args.d_type)
+        d_type=args.d_type).to(device=_DEVICE_)
 
     discriminator.apply(init_weights)
     discriminator.type(float_dtype).train()
@@ -362,7 +362,9 @@ def main(args):
 def discriminator_step(
     args, batch, generator, discriminator, d_loss_fn, optimizer_d
 ):
-    batch = [tensor.cuda() for tensor in batch]
+    # if torch.cuda.is_available():
+    #     batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
+
     (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped,
      loss_mask, seq_start_end) = batch
     losses = {}
@@ -400,7 +402,7 @@ def discriminator_step(
 def generator_step(
     args, batch, generator, discriminator, g_loss_fn, optimizer_g
 ):
-    batch = [tensor.cuda() for tensor in batch]
+    # batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
     (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped,
      loss_mask, seq_start_end) = batch
     losses = {}
@@ -468,7 +470,7 @@ def check_accuracy(
     generator.eval()
     with torch.no_grad():
         for batch in loader:
-            batch = [tensor.cuda() for tensor in batch]
+            # batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
             (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
              non_linear_ped, loss_mask, seq_start_end) = batch
             linear_ped = 1 - non_linear_ped
