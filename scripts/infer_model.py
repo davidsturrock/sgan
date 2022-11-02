@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import sys
 
@@ -101,11 +103,6 @@ def infer(args, loader, generator, num_samples):
         total_traj += pred_traj_gt.size(1)
         ota = obs_traj.numpy()
         ptga = pred_traj_gt.numpy()
-
-        mlp = torch.nn.Linear(in_features=2, out_features=generator.noise_first_dim)
-
-
-
         user_noise1 = torch.zeros((seq_start_end.shape[0], generator.noise_first_dim), device=_DEVICE_)
         # user_noise2 = torch.randn((seq_start_end.shape[0], generator.noise_first_dim), device=_DEVICE_)*2
         # user_noise3 = torch.ones((seq_start_end.shape[0], generator.noise_first_dim), device=_DEVICE_)
@@ -126,7 +123,7 @@ def infer(args, loader, generator, num_samples):
                 # Only need to plot one with z as all zeros
                 if i == 0:
                     continue
-                sys.exit(0)
+            sys.exit(0)
             # print(f'len FDE list {len(fde)}, Tensor shape {fde[0].shape}')
             fde_unpacked = [torch.argmax(t).item() for t in fde]
             # print(*[t[0:10] for t in fde])
@@ -142,6 +139,68 @@ def infer(args, loader, generator, num_samples):
         ade = sum(ade_outer) / (total_traj * args.pred_len)
         fde = sum(fde_outer) / total_traj
         return ade, fde
+
+
+def train_mlp(args, loader, generator, training_iters=1000, print_every = 50):
+    ade_outer, fde_outer = [], []
+    total_traj = 0
+    """
+    Inputs:
+    - obs_traj: Tensor of shape (obs_len, batch, 2)
+    - obs_traj_rel: Tensor of shape (obs_len, batch, 2)
+    - seq_start_end: A list of tuples which delimit sequences within batch.
+    - user_noise: Generally used for inference when you want to see
+    relation between different types of noise and outputs.
+    Output:
+    - pred_traj_rel: Tensor of shape (self.pred_len, batch, 2)
+    """
+    xs = torch.ones(8, dtype=torch.float) * 0.25
+
+    ys = torch.ones(8, dtype=torch.float) * 0.25
+    pred_xs = torch.ones(8, dtype=torch.float) * 0.25
+    # pred_ys = torch.ones(8, dtype=torch.float) * 0.25
+    pred_ys = torch.zeros(8, dtype=torch.float)
+
+    obs_traj_rel = torch.tensor(list(zip(xs, ys)), dtype=torch.float).reshape(8, 1, 2)
+    start_positions_obs = torch.zeros((obs_traj_rel.shape[1], 2), dtype=torch.float)
+    obs_traj = relative_to_abs(obs_traj_rel, start_positions_obs)
+
+    pred_traj_gt_rel = torch.tensor(list(zip(pred_xs, pred_ys)), dtype=torch.float).reshape(8, 1, 2)
+    start_positions_preds = obs_traj[-1].clone().detach()
+
+    pred_traj_gt = relative_to_abs(pred_traj_gt_rel, start_positions_preds)
+
+    # non_linear_ped = torch.tensor()
+    # loss_mask = torch.tensor()
+    seq_start_end = torch.tensor([0, 1]).resize(1, 2)
+    ade, fde = [], []
+    total_traj += pred_traj_gt.size(1)
+    ota = obs_traj.detach().numpy()
+    ptga = pred_traj_gt.detach().numpy()
+
+    mlp = torch.nn.Linear(in_features=2, out_features=generator.noise_first_dim, device=_DEVICE_)
+    mlp_optimiser = torch.optim.Adam(mlp.parameters(), lr=5e-4)
+    loss_func = torch.nn.L1Loss()
+    user_noise1 = torch.zeros((seq_start_end.shape[0], generator.noise_first_dim), device=_DEVICE_)
+    start = time.perf_counter()
+    for i in range(training_iters):
+        noise = mlp(*pred_traj_gt.clone().detach()[-1]).reshape(1, 8)
+        # with torch.no_grad():
+        pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, user_noise=noise)
+        pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
+        mlp_optimiser.zero_grad()
+        loss = loss_func(pred_traj_fake, pred_traj_gt)
+        loss.backward()
+        mlp_optimiser.step()
+
+        ptfa = pred_traj_fake.detach().numpy()
+        if i % print_every == 0:
+            title = f'mlp/{i}_{noise}'
+            save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end.detach().numpy())
+            print(f'Elapsed: {time.perf_counter()-start:.2f}s (Training Iter {i}/{training_iters})'
+                  f'Loss {loss:.2f}')
+
+        # plot_trajectories(ota, ptga, ptfa, seq_start_end.detach().numpy())
 
 
 def main(args):
@@ -164,7 +223,28 @@ def main(args):
         print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
               f' ADE: {ade:.2f}, FDE: {fde:.2f}')
 
+def train(args):
+    if os.path.isdir(args.model_path):
+        filenames = os.listdir(args.model_path)
+        filenames.sort()
+        paths = [
+            os.path.join(args.model_path, file_) for file_ in filenames
+        ]
+    else:
+        paths = [args.model_path]
+
+    for path in paths:
+        checkpoint = torch.load(path, map_location=torch.device('cpu'))
+        generator = get_generator(checkpoint)
+        _args = AttrDict(checkpoint['args'])
+        dpath = get_dset_path(_args.dataset_name, args.dset_type)
+        _, loader = data_loader(_args, dpath)
+        train_mlp(_args, loader, generator)
+        # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
+        #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    main(args)
+    # main(args)
+    train(args)
