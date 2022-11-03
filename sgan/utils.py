@@ -1,3 +1,7 @@
+import random
+
+import pathlib
+
 import sys
 
 import os
@@ -54,18 +58,30 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
 
 
 def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
-    for s, e in seq_start_end[:, :]:
+    # print(seq_start_end)
+    chosen = random.randint(0, len(seq_start_end))
+    for k, (s, e) in enumerate(seq_start_end[:, :]):
+        if k != chosen:
+            continue
         cmap = list(mcolours.TABLEAU_COLORS.keys())
+        if len(cmap) < e - s:
+            cmap = list(mcolours.CSS4_COLORS.keys())
         fig, ax = plt.subplots()
+        # print(f's {s}, e {e}')
         for j in range(s, e):
             colour = cmap.pop(0)
+            # try:
+            #     colour = cmap[j-s]
+            # except IndexError:
+            # print(f'j-s {j} - {s} = {j-s}')
+
             l1 = ax.plot(obs_traj_abs[:, j, 0], obs_traj_abs[:, j, 1], c=colour, linestyle='', marker='.')
             l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
             l3 = ax.plot(pred_traj_fake_abs[:, j, 0], pred_traj_fake_abs[:, j, 1], c=colour, linestyle='', marker='*')
         plt.axis('square')
-        ax.set_ylim([0,10])
-        ax.set_xlim([0,10])
-        plt.title('Trajectories in relative coordinates')
+        # ax.set_ylim([0, 10])
+        # ax.set_xlim([0, 10])
+        plt.title(f'Trajectories in Seq {k}')
 
         ax.set_xlabel('X [m]')
         ax.set_ylabel('Y [m]')
@@ -77,7 +93,9 @@ def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_a
         star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*', markersize=5, label='Pred_traj_fake')
 
         ax.legend(handles=[dot_line, star_line])
-        plt.savefig(f'/home/david/Pictures/plots/inference exps/{title}.png', bbox_inches='tight')
+        save_file = pathlib.Path('/home/david/Pictures/plots/inference exps') / f'{title}_seq_{k}.png'
+        save_file.parent.mkdir(exist_ok=True, parents=True)
+        plt.savefig(save_file, bbox_inches='tight')
         plt.close()
 
 

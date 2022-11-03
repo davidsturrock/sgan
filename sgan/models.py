@@ -1,3 +1,5 @@
+import sys
+
 import torch
 import torch.nn as nn
 
@@ -377,6 +379,7 @@ class TrajectoryGenerator(nn.Module):
         self.num_layers = num_layers
         self.noise_type = noise_type
         self.noise_mix_type = noise_mix_type
+        self.noise_shape = None
         self.pooling_type = pooling_type
         self.noise_first_dim = 0
         self.pool_every_timestep = pool_every_timestep
@@ -448,7 +451,7 @@ class TrajectoryGenerator(nn.Module):
                 dropout=dropout
             )
 
-    def add_noise(self, _input, seq_start_end, user_noise=None):
+    def add_noise(self, _input, seq_start_end, user_noise=None, injection_idx=None):
         """
         Inputs:
         - _input: Tensor of shape (_, decoder_h_dim - noise_first_dim)
@@ -462,14 +465,20 @@ class TrajectoryGenerator(nn.Module):
             return _input
 
         if self.noise_mix_type == 'global':
-            noise_shape = (seq_start_end.size(0), ) + self.noise_dim
+            self.noise_shape = (seq_start_end.size(0), ) + self.noise_dim
         else:
-            noise_shape = (_input.size(0), ) + self.noise_dim
+            self.noise_shape = (_input.size(0), ) + self.noise_dim
 
-        if user_noise is not None:
+        if user_noise is not None and injection_idx is None:
             z_decoder = user_noise
+            # print(f'User noise added. z_decoder shape: {z_decoder.shape}')
+
         else:
-            z_decoder = get_noise(noise_shape, self.noise_type, self.device)
+            z_decoder = get_noise(self.noise_shape, self.noise_type, self.device)
+            if injection_idx is not None and user_noise is not None:
+                z_decoder[injection_idx] = user_noise
+            # print(f'z_decoder shape: {z_decoder.shape}')
+            # sys.exit(0)
 
         if self.noise_mix_type == 'global':
             _list = []
@@ -495,7 +504,7 @@ class TrajectoryGenerator(nn.Module):
         else:
             return False
 
-    def forward(self, obs_traj, obs_traj_rel, seq_start_end, user_noise=None):
+    def forward(self, obs_traj, obs_traj_rel, seq_start_end, user_noise=None, injection_idx=None):
         """
         Inputs:
         - obs_traj: Tensor of shape (obs_len, batch, 2)
@@ -526,7 +535,7 @@ class TrajectoryGenerator(nn.Module):
         else:
             noise_input = mlp_decoder_context_input
         decoder_h = self.add_noise(
-            noise_input, seq_start_end, user_noise=user_noise)
+            noise_input, seq_start_end, user_noise=user_noise, injection_idx=injection_idx)
         decoder_h = torch.unsqueeze(decoder_h, 0)
 
         decoder_c = torch.zeros(self.num_layers, batch, self.decoder_h_dim, device=self.device)
