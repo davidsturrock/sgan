@@ -32,7 +32,7 @@ class Encoder(nn.Module):
     TrajectoryDiscriminator"""
     def __init__(
         self, embedding_dim=64, h_dim=64, mlp_dim=1024, num_layers=1,
-        dropout=0.0
+        dropout=0.0, return_c=False
     ):
         super(Encoder, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -40,7 +40,8 @@ class Encoder(nn.Module):
         self.h_dim = h_dim
         self.embedding_dim = embedding_dim
         self.num_layers = num_layers
-
+        # Need cell state of encoder for Intention Force Generator
+        self.return_c = return_c
         self.encoder = nn.LSTM(
             embedding_dim, h_dim, num_layers, dropout=dropout
         )
@@ -72,6 +73,8 @@ class Encoder(nn.Module):
         state_tuple = self.init_hidden(batch)
         output, state = self.encoder(obs_traj_embedding, state_tuple)
         final_h = state[0]
+        if self.return_c:
+            return final_h, state[1]
         return final_h
 
 
@@ -619,3 +622,98 @@ class TrajectoryDiscriminator(nn.Module):
             )
         scores = self.real_classifier(classifier_input)
         return scores
+
+class IntentionForceGenerator(nn.Module):
+    def __init__(
+        self, obs_len, pred_len, embedding_dim=64, encoder_h_dim=64,
+        decoder_h_dim=128, mlp_dim=1024, num_layers=1, noise_dim=(0, ),
+        noise_type='gaussian', noise_mix_type='ped', pooling_type=None,
+        pool_every_timestep=True, dropout=0.0, bottleneck_dim=1024,
+        activation='relu', batch_norm=True, neighborhood_size=2.0, grid_size=8
+    ):
+        if pooling_type and pooling_type.lower() == 'none':
+            pooling_type = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.obs_len = obs_len
+        self.pred_len = pred_len
+        self.mlp_dim = mlp_dim
+        self.encoder_h_dim = encoder_h_dim
+        self.decoder_h_dim = decoder_h_dim
+        self.embedding_dim = embedding_dim
+        self.noise_dim = noise_dim
+        self.num_layers = num_layers
+        self.noise_type = noise_type
+        self.noise_mix_type = noise_mix_type
+        self.noise_shape = None
+        self.pooling_type = pooling_type
+        self.noise_first_dim = 0
+        self.pool_every_timestep = pool_every_timestep
+        self.bottleneck_dim = 1024
+
+        self.encoder = Encoder(
+            embedding_dim=embedding_dim,
+            h_dim=encoder_h_dim,
+            mlp_dim=mlp_dim,
+            num_layers=num_layers,
+            dropout=dropout,
+            return_c=True
+        )
+
+        self.decoder = Decoder(
+            pred_len,
+            embedding_dim=embedding_dim,
+            h_dim=decoder_h_dim,
+            mlp_dim=mlp_dim,
+            num_layers=num_layers,
+            pool_every_timestep=pool_every_timestep,
+            dropout=dropout,
+            bottleneck_dim=bottleneck_dim,
+            activation=activation,
+            batch_norm=batch_norm,
+            pooling_type=pooling_type,
+            grid_size=grid_size,
+            neighborhood_size=neighborhood_size
+        )
+
+        if self.noise_dim[0] == 0:
+            self.noise_dim = None
+        else:
+            self.noise_first_dim = noise_dim[0]
+
+        # Decoder Hidden
+        if pooling_type:
+            input_dim = encoder_h_dim + bottleneck_dim
+        else:
+            input_dim = encoder_h_dim
+
+    def forward(self, obs_traj, obs_traj_rel, seq_start_end):
+        """
+        Inputs:
+        - obs_traj: Tensor of shape (obs_len, batch, 2)
+        - obs_traj_rel: Tensor of shape (obs_len, batch, 2)
+        - seq_start_end: A list of tuples which delimit sequences within batch.
+        - user_noise: Generally used for inference when you want to see
+        relation between different types of noise and outputs.
+        Output:
+        - pred_traj_rel: Tensor of shape (self.pred_len, batch, 2)
+        """
+        batch = obs_traj_rel.size(1)
+        # Encode seq
+        final_encoder_h, final_encoder_c = self.encoder(obs_traj_rel,)
+        print(f'final_h shape: {final_encoder_h.size()}\n'
+              f'final_c shape: {final_encoder_c.size()}')
+        state_tuple = (final_encoder_h, final_encoder_c)
+        last_pos = obs_traj[-1]
+        last_pos_rel = obs_traj_rel[-1]
+        # Predict Trajectory
+
+        decoder_out = self.decoder(
+            last_pos,
+            last_pos_rel,
+            state_tuple,
+            seq_start_end,
+        )
+        pred_traj_fake_rel, final_decoder_h = decoder_out
+
+        return pred_traj_fake_rel
+

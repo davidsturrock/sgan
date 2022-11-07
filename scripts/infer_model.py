@@ -1,3 +1,5 @@
+import random
+
 import pathlib
 
 import time
@@ -143,9 +145,7 @@ def infer(args, loader, generator, num_samples):
         return ade, fde
 
 
-def train_mlp(args, loader, generator, training_iters=1000, print_every=200):
-    ade_outer, fde_outer = [], []
-    total_traj = 0
+def train_mlp(args, loader, generator, training_iters=1000, print_every=50, plot_every=200):
     """
     Inputs:
     - obs_traj: Tensor of shape (obs_len, batch, 2)
@@ -156,36 +156,13 @@ def train_mlp(args, loader, generator, training_iters=1000, print_every=200):
     Output:
     - pred_traj_rel: Tensor of shape (self.pred_len, batch, 2)
     """
-    # xs = torch.ones(8, dtype=torch.float) * 0.25
-
-    # ys = torch.ones(8, dtype=torch.float) * 0.25
-    # pred_xs = torch.ones(8, dtype=torch.float) * 0.25
-    # pred_ys = torch.ones(8, dtype=torch.float) * 0.25
-    # pred_ys = torch.zeros(8, dtype=torch.float)
-
-    # obs_traj_rel = torch.tensor(list(zip(xs, ys)), dtype=torch.float).reshape(8, 1, 2)
-    # start_positions_obs = torch.zeros((obs_traj_rel.shape[1], 2), dtype=torch.float)
-    # obs_traj = relative_to_abs(obs_traj_rel, start_positions_obs)
-
-    # pred_traj_gt_rel = torch.tensor(list(zip(pred_xs, pred_ys)), dtype=torch.float).reshape(8, 1, 2)
-    # start_positions_preds = obs_traj[-1].clone().detach()
-
-    # pred_traj_gt = relative_to_abs(pred_traj_gt_rel, start_positions_preds)
-    # seq_start_end = torch.tensor([0, 1]).resize(1, 2)
-    # non_linear_ped = torch.tensor()
-    # loss_mask = torch.tensor()
-    # ================================================================================================
-    # if generator.noise_mix_type == 'global':
-    #     noise_shape = (seq_start_end.size(0),) + generator.noise_dim
-    # else:
-    #     noise_shape = (_input.size(0),) + generator.noise_dim
+    ade_outer, fde_outer = [], []
+    total_traj = 0
     mlp = torch.nn.Linear(in_features=2, out_features=loader.batch_size * generator.noise_first_dim, device=_DEVICE_)
-    # mlp = torch.nn.Linear(in_features=2, out_features=generator.noise_first_dim, device=_DEVICE_)
+
     mlp_optimiser = torch.optim.Adam(mlp.parameters(), lr=5e-4)
     loss_func = torch.nn.L1Loss()
-    # user_noise1 = torch.zeros((seq_start_end.shape[0], generator.noise_first_dim), device=_DEVICE_)
     start = time.perf_counter()
-    ade, fde = [], []
     for j, batch in enumerate(loader):
         (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
          non_linear_ped, loss_mask, seq_start_end) = batch
@@ -199,7 +176,10 @@ def train_mlp(args, loader, generator, training_iters=1000, print_every=200):
             # print(f'seq_s_e shape: {seq_start_end.shape}')
             # print(f'seq 0 s + end: {seq_start_end[0]}')
             # print(f'seq 0 end: {seq_start_end[0][1]}')
-            first_agent_idx = seq_start_end[0][0]
+            # WRONG!
+            # first_agent_idx = seq_start_end[0][0]
+            # For now choose random
+            first_agent_idx = random.randint(0, seq_start_end.size(0))
             first_agent_pred_gt = pred_traj_gt.clone()[::, first_agent_idx]
             # print(f'First agent pred gt: {first_agent_pred_gt}')
             first_agent_goal_pt = first_agent_pred_gt[-1]
@@ -212,7 +192,7 @@ def train_mlp(args, loader, generator, training_iters=1000, print_every=200):
             pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end,
                                            user_noise=agent_noise, injection_idx=None)
             pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
-            first_agent_pred_pt = pred_traj_fake.clone()[::, first_agent_idx][-1]
+            first_agent_pred_pt = pred_traj_fake.clone()[-1, first_agent_idx]
             # if i == 1:
             #     print(f'Pred pt {first_agent_pred_pt} | Goal pt: {first_agent_goal_pt}')
 
@@ -229,14 +209,15 @@ def train_mlp(args, loader, generator, training_iters=1000, print_every=200):
             fde.append(final_displacement_error(
                 pred_traj_fake[-1], pred_traj_gt[-1], mode='raw'
             ))
-            if i % print_every == 0:
+            if i % plot_every == 0:
                 # fde_unpacked = [torch.argmin(t).item() for t in fde]
                 # min_fde = fde_unpacked.index(min(fde_unpacked))
                 # print(f'Index of traj with smallest FDE: {min_fde}')
                 # print(f'FDE : {fde[0][fde_unpacked[0]]} | len: {len(fde[0])}')
                 # print(f'FDE unpacked : {fde_unpacked} | len: {len(fde_unpacked)}')
                 title = f'mlp/epoch_{j}/iter_{i}'
-                save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end.detach().numpy())
+                save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end.detach().numpy(), first_agent_idx)
+            if i % print_every == 0:
                 # Calculate ADE and FDE for the epoch
                 ade_sum = evaluate_helper(ade, seq_start_end)
                 fde_sum = evaluate_helper(fde, seq_start_end)
@@ -295,6 +276,8 @@ def train(args):
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         generator = get_generator(checkpoint)
         _args = AttrDict(checkpoint['args'])
+        # print(_args)
+        # sys.exit(0)
         dpath = get_dset_path(_args.dataset_name, args.dset_type)
         _, loader = data_loader(_args, dpath)
         train_mlp(_args, loader, generator)

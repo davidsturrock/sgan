@@ -5,7 +5,7 @@ import torch
 from attrdict import AttrDict
 
 from sgan.data.loader import data_loader
-from sgan.models import TrajectoryGenerator
+from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator
 from sgan.losses import displacement_error, final_displacement_error
 from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories
 
@@ -40,6 +40,24 @@ def get_generator(checkpoint):
     # generator.cuda(device=_DEVICE_)
     generator.train()
     return generator
+
+def get_discriminator(checkpoint):
+    """Added for transfer learning restore from checkpoint in train_goal.py"""
+    args = AttrDict(checkpoint['args'])
+    discriminator = TrajectoryDiscriminator(
+        obs_len=args.obs_len,
+        pred_len=args.pred_len,
+        embedding_dim=args.embedding_dim,
+        h_dim=args.encoder_h_dim_d,
+        mlp_dim=args.mlp_dim,
+        num_layers=args.num_layers,
+        dropout=args.dropout,
+        batch_norm=args.batch_norm,
+        d_type=args.d_type).to(device=_DEVICE_)
+    discriminator.load_state_dict(checkpoint['d_state'])
+    # discriminator.cuda(device=_DEVICE_)
+    discriminator.train()
+    return discriminator
 
 
 def evaluate_helper(error, seq_start_end):

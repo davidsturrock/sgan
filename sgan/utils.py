@@ -57,11 +57,13 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
         plt.close(fig)
 
 
-def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
+def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end, agent_idx):
     # print(seq_start_end)
-    chosen = random.randint(0, len(seq_start_end))
+    # chosen = random.randint(0, len(seq_start_end))
     for k, (s, e) in enumerate(seq_start_end[:, :]):
-        if k != chosen:
+        # if k != agent_idx:
+        #     continue
+        if not (s <= agent_idx < e):
             continue
         cmap = list(mcolours.TABLEAU_COLORS.keys())
         if len(cmap) < e - s:
