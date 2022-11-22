@@ -2,7 +2,10 @@ import argparse
 import gc
 import logging
 import os
+from pathlib import Path
 import sys
+# sys.path.insert(0, f'{Path.cwd().parent}')
+# print(f'{Path.cwd().parent}')
 import time
 
 from collections import defaultdict
@@ -12,12 +15,12 @@ import torch.nn as nn
 import torch.optim as optim
 from pathlib import Path
 
-from scripts.evaluate_model import get_generator, get_discriminator
+from evaluate_model import get_generator, get_discriminator
 from sgan.data.loader import data_loader
 from sgan.losses import gan_g_loss, gan_d_loss, l2_loss
 from sgan.losses import displacement_error, final_displacement_error
 
-from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator
+from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator, IntentionForceGenerator
 from sgan.utils import int_tuple, bool_flag, get_total_norm
 from sgan.utils import relative_to_abs, get_dset_path
 
@@ -83,8 +86,8 @@ parser.add_argument('--best_k', default=1, type=int)
 # Output
 parser.add_argument('--output_dir', default=os.getcwd())
 parser.add_argument('--print_every', default=5, type=int)
-parser.add_argument('--checkpoint_every', default=100, type=int)
-parser.add_argument('--checkpoint_name', default='checkpoint')
+parser.add_argument('--checkpoint_every', default=50, type=int)
+parser.add_argument('--checkpoint_name', default='checkpoint_intention')
 parser.add_argument('--checkpoint_start_from', default=None)
 parser.add_argument('--restore_from_checkpoint', default=1, type=int)
 parser.add_argument('--num_samples_check', default=5000, type=int)
@@ -111,14 +114,19 @@ def get_dtypes(args):
 
 
 def main(args):
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_num
+    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_num
+    try:
+        logger.info(f"Device: {_DEVICE_} CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    except KeyError:
+        logger.info(f"Device: {_DEVICE_}")
     train_path = get_dset_path(args.dataset_name, 'train')
     val_path = get_dset_path(args.dataset_name, 'val')
 
     long_dtype, float_dtype = get_dtypes(args)
-
+    logger.info(f"float dtype: {float_dtype}")
     logger.info("Initializing train dataset")
     train_dset, train_loader = data_loader(args, train_path)
+    # logger.info(f'train_dset len :{len(train_dset)}')
     logger.info("Initializing val dataset")
     _, val_loader = data_loader(args, val_path)
 
@@ -130,8 +138,8 @@ def main(args):
         'There are {} iterations per epoch'.format(iterations_per_epoch)
     )
     # Maybe restore from checkpoint
-    restore_path = '/home/david/code/sgan/models/sgan-p-models/eth_8_model.pt'
-
+    # restore_path = '/home/david/code/sgan/models/sgan-p-models/eth_8_model.pt'
+    restore_path = None
     if args.checkpoint_start_from is not None:
         restore_path = args.checkpoint_start_from
     elif args.restore_from_checkpoint == 1:
@@ -166,8 +174,28 @@ def main(args):
             bottleneck_dim=args.bottleneck_dim,
             neighborhood_size=args.neighborhood_size,
             grid_size=args.grid_size,
-            batch_norm=args.batch_norm).to(device=_DEVICE_)
+            batch_norm=args.batch_norm)
 
+        # generator = IntentionForceGenerator(
+        #     obs_len=args.obs_len,
+        #     pred_len=args.pred_len,
+        #     embedding_dim=args.embedding_dim,
+        #     encoder_h_dim=args.encoder_h_dim_g,
+        #     decoder_h_dim=args.decoder_h_dim_g,
+        #     mlp_dim=args.mlp_dim,
+        #     num_layers=args.num_layers,
+        #     pooling_type=args.pooling_type,
+        #     pool_every_timestep=args.pool_every_timestep,
+        #     dropout=args.dropout,
+        #     bottleneck_dim=args.bottleneck_dim,
+        #     neighborhood_size=args.neighborhood_size,
+        #     grid_size=args.grid_size,
+        #     batch_norm=args.batch_norm)
+        # print(generator.__dict__)
+        # sys.exit(0)
+        logger.info(f'Generator created')
+        # generator = generator.to(device=_DEVICE_)
+        # logger.info('Generator moved to GPU mem.')
         generator.apply(init_weights)
 
         discriminator = TrajectoryDiscriminator(
@@ -179,8 +207,10 @@ def main(args):
             num_layers=args.num_layers,
             dropout=args.dropout,
             batch_norm=args.batch_norm,
-            d_type=args.d_type).to(device=_DEVICE_)
-
+            d_type=args.d_type)
+        logger.info('Discriminator created')
+        # discriminator = discriminator.to(device=_DEVICE_)
+        # logger.info('Discriminator moved to GPU mem.')
         discriminator.apply(init_weights)
 
         # Starting from scratch, so initialize checkpoint data structure
@@ -212,12 +242,15 @@ def main(args):
             'best_t_nl': None,
         }
     t0 = None
-
-    generator.type(float_dtype).train()
+    # generator.cuda()
+    # generator.type(float_dtype)
+    # logger.info('type() called:')
+    # generator.type(float_dtype).train()
+    generator.train()
     logger.info('Here is the generator:')
     logger.info(generator)
-
-    discriminator.type(float_dtype).train()
+    discriminator.train()
+    # discriminator.type(float_dtype).train()
     logger.info('Here is the discriminator:')
     logger.info(discriminator)
 
@@ -236,6 +269,7 @@ def main(args):
         epoch += 1
         logger.info('Starting epoch {}'.format(epoch))
         for batch in train_loader:
+            # batch = batch.to(_DEVICE_)
             if args.timing == 1:
                 torch.cuda.synchronize()
                 t1 = time.time()
@@ -367,14 +401,16 @@ def main(args):
 def discriminator_step(
     args, batch, generator, discriminator, d_loss_fn, optimizer_d
 ):
-    # if torch.cuda.is_available():
-    #     batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
+    if torch.cuda.is_available():
+        batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
 
     (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped,
      loss_mask, seq_start_end) = batch
     losses = {}
     loss = torch.zeros(1).to(pred_traj_gt)
     #TODO add goal
+    logger.info(f'Input types: obs_traj {obs_traj.type()} obs_traj_rel {obs_traj_rel.type()}')
+    # sys.exit(0)
     generator_out = generator(obs_traj, obs_traj_rel, seq_start_end)
 
     pred_traj_fake_rel = generator_out
@@ -384,7 +420,8 @@ def discriminator_step(
     traj_real_rel = torch.cat([obs_traj_rel, pred_traj_gt_rel], dim=0)
     traj_fake = torch.cat([obs_traj, pred_traj_fake], dim=0)
     traj_fake_rel = torch.cat([obs_traj_rel, pred_traj_fake_rel], dim=0)
-
+    # print(f'traj_fake shape: {traj_fake.size()}')
+    # print(f'traj_fake_rel shape: {traj_fake_rel.size()}')
     scores_fake = discriminator(traj_fake, traj_fake_rel, seq_start_end)
     scores_real = discriminator(traj_real, traj_real_rel, seq_start_end)
 
@@ -407,7 +444,8 @@ def discriminator_step(
 def generator_step(
     args, batch, generator, discriminator, g_loss_fn, optimizer_g
 ):
-    # batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
+    if torch.cuda.is_available():
+        batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
     (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped,
      loss_mask, seq_start_end) = batch
     losses = {}
@@ -476,7 +514,8 @@ def check_accuracy(
     generator.eval()
     with torch.no_grad():
         for batch in loader:
-            # batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
+            if torch.cuda.is_available():
+                batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
             (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
              non_linear_ped, loss_mask, seq_start_end) = batch
             linear_ped = 1 - non_linear_ped
