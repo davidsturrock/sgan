@@ -16,7 +16,9 @@ from matplotlib import pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.colors as mcolours
 
-matplotlib.use('tkagg')
+# Only use tkagg backend on laptop NOT HPC
+if not torch.cuda.is_available():
+    matplotlib.use('tkagg')
 
 
 def get_cmap(n, name='hsv'):
