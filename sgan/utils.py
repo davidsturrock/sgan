@@ -30,13 +30,15 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
     for i, (s, e) in enumerate(seq_start_end[::, ::]):
         # print(f'i {i}, s {s},e {e}')
         cmap = list(mcolours.TABLEAU_COLORS.keys())
+        if len(cmap) < e - s:
+            cmap = list(mcolours.CSS4_COLORS.keys())
         fig, ax = plt.subplots()
 
         for j in range(s, e):
             colour = cmap.pop(0)
             l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
                          linestyle='', marker='.')
-            # l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
+            l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
             l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], c=colour, linestyle='',
                          marker='*')
 
@@ -187,3 +189,33 @@ def relative_to_abs(rel_traj, start_pos):
     start_pos = torch.unsqueeze(start_pos, dim=1)
     abs_traj = displacement + start_pos
     return abs_traj.permute(1, 0, 2)
+
+
+def plot_losses(checkpoint):
+    # g_losses = checkpoint['G_losses']['G_total_loss']
+    g_losses = checkpoint['metrics_train']['g_l2_loss_rel']
+    # d_losses = checkpoint['D_losses']['D_total_loss']
+    d_losses = checkpoint['metrics_train']['d_loss']
+    print(checkpoint['metrics_train'].keys())
+    fde = checkpoint['metrics_train']['fde']
+    ade = checkpoint['metrics_train']['ade']
+    fig, ax = plt.subplots()
+    # step = checkpoint['args']['checkpoint_every']
+    # x_vals = list(range(0, len(g_losses) * step, step))
+    l1 = ax.plot(g_losses, 'g', linestyle='-', marker='.', markersize=0.1, label='Generator Losses')
+    l2 = ax.plot(d_losses, 'r', linestyle='-', marker='.', markersize=0.1, label='Discriminator Losses')
+    # l3 = ax.plot(fde, 'b', linestyle='-', marker='.', markersize=0.1, label='Train FDE')
+    # l4 = ax.plot(ade, 'c', linestyle='-', marker='.', markersize=0.1, label='Train ADE')
+    # plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+    plt.title('Metrics Graph')
+    # plt.axis('square')
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+    # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+    ax.legend()
+    plt.show()
+    plt.waitforbuttonpress()
+    plt.close(fig)
+
+
+
