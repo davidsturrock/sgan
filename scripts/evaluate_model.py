@@ -5,9 +5,9 @@ import torch
 from attrdict import AttrDict
 
 from sgan.data.loader import data_loader
-from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator
+from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator, IntentionForceGenerator
 from sgan.losses import displacement_error, final_displacement_error
-from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories
+from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories, plot_losses
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
@@ -29,6 +29,28 @@ def get_generator(checkpoint):
         noise_dim=args.noise_dim,
         noise_type=args.noise_type,
         noise_mix_type=args.noise_mix_type,
+        pooling_type=args.pooling_type,
+        pool_every_timestep=args.pool_every_timestep,
+        dropout=args.dropout,
+        bottleneck_dim=args.bottleneck_dim,
+        neighborhood_size=args.neighborhood_size,
+        grid_size=args.grid_size,
+        batch_norm=args.batch_norm)
+    generator.load_state_dict(checkpoint['g_state'])
+    # generator.cuda(device=_DEVICE_)
+    generator.train()
+    return generator
+
+def get_intention_generator(checkpoint):
+    args = AttrDict(checkpoint['args'])
+    generator = IntentionForceGenerator(
+        obs_len=args.obs_len,
+        pred_len=args.pred_len,
+        embedding_dim=args.embedding_dim,
+        encoder_h_dim=args.encoder_h_dim_g,
+        decoder_h_dim=args.decoder_h_dim_g,
+        mlp_dim=args.mlp_dim,
+        num_layers=args.num_layers,
         pooling_type=args.pooling_type,
         pool_every_timestep=args.pool_every_timestep,
         dropout=args.dropout,
@@ -90,7 +112,10 @@ def evaluate(args, loader, generator, num_samples):
             total_traj += pred_traj_gt.size(1)
             ota = obs_traj.numpy()
             ptga = pred_traj_gt.numpy()
-            user_noise = torch.ones((seq_start_end.shape[0], generator.noise_first_dim), device=_DEVICE_)
+            # try:
+            #     user_noise = torch.ones((seq_start_end.shape[0], generator.noise_first_dim), device=_DEVICE_)
+            # except AttributeError:
+            #     user_noise = t
             for _ in range(num_samples):
                 pred_traj_fake_rel = generator(
                     obs_traj, obs_traj_rel, seq_start_end)
@@ -136,10 +161,16 @@ def main(args):
 
     for path in paths:
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
-        generator = get_generator(checkpoint)
+        if 'intention' in path:
+            generator = get_intention_generator(checkpoint)
+        else:
+            generator = get_generator(checkpoint)
+
+        print(generator)
         _args = AttrDict(checkpoint['args'])
         dpath = get_dset_path(_args.dataset_name, args.dset_type)
         _, loader = data_loader(_args, dpath)
+        plot_losses(checkpoint)
         ade, fde = evaluate(_args, loader, generator, args.num_samples)
         print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
               f' ADE: {ade:.2f}, FDE: {fde:.2f}')
@@ -147,4 +178,6 @@ def main(args):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    args.model_path = '/home/david/data/checkpoint_with_model.pt'
+    # args.model_path = '/home/david/code/sgan/models/sgan-models/eth_8_model.pt'
     main(args)
