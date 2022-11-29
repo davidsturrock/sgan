@@ -53,7 +53,7 @@ parser.add_argument('--mlp_dim', default=64, type=int)
 
 # Generator Options
 parser.add_argument('--encoder_h_dim_g', default=32, type=int)
-parser.add_argument('--decoder_h_dim_g', default=32, type=int)
+parser.add_argument('--decoder_h_dim_g', default=64, type=int)
 parser.add_argument('--noise_dim', default=(0, ), type=int_tuple)
 parser.add_argument('--noise_type', default='gaussian')
 parser.add_argument('--noise_mix_type', default='global')
