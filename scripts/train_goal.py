@@ -20,7 +20,7 @@ from sgan.data.loader import data_loader
 from sgan.losses import gan_g_loss, gan_d_loss, l2_loss
 from sgan.losses import displacement_error, final_displacement_error
 
-from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator, IntentionForceGenerator
+from sgan.models import TrajectoryDiscriminator, IntentionForceGenerator
 from sgan.utils import int_tuple, bool_flag, get_total_norm
 from sgan.utils import relative_to_abs, get_dset_path
 
@@ -53,8 +53,8 @@ parser.add_argument('--mlp_dim', default=64, type=int)
 
 # Generator Options
 parser.add_argument('--encoder_h_dim_g', default=32, type=int)
-parser.add_argument('--decoder_h_dim_g', default=64, type=int)
-parser.add_argument('--noise_dim', default=(0, ), type=int_tuple)
+parser.add_argument('--decoder_h_dim_g', default=68, type=int)
+parser.add_argument('--noise_dim', default=(0,), type=int_tuple)
 parser.add_argument('--noise_type', default='gaussian')
 parser.add_argument('--noise_mix_type', default='global')
 parser.add_argument('--clipping_threshold_g', default=1.5, type=float)
@@ -399,7 +399,7 @@ def main(args):
 
 
 def discriminator_step(
-    args, batch, generator, discriminator, d_loss_fn, optimizer_d
+        args, batch, generator, discriminator, d_loss_fn, optimizer_d
 ):
     if torch.cuda.is_available():
         batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
@@ -408,8 +408,8 @@ def discriminator_step(
      loss_mask, seq_start_end) = batch
     losses = {}
     loss = torch.zeros(1).to(pred_traj_gt)
-    #TODO add goal
-    generator_out = generator(obs_traj, obs_traj_rel, seq_start_end)
+    # Using final predicted ground truth point as goal point during training.
+    generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
 
     pred_traj_fake_rel = generator_out
     pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
@@ -428,7 +428,7 @@ def discriminator_step(
     losses['D_data_loss'] = data_loss.item()
     loss += data_loss
     losses['D_total_loss'] = loss.item()
-
+    # TODO add l2 loss
     optimizer_d.zero_grad()
     loss.backward()
     if args.clipping_threshold_d > 0:
@@ -440,7 +440,7 @@ def discriminator_step(
 
 
 def generator_step(
-    args, batch, generator, discriminator, g_loss_fn, optimizer_g
+        args, batch, generator, discriminator, g_loss_fn, optimizer_g
 ):
     if torch.cuda.is_available():
         batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
@@ -453,8 +453,8 @@ def generator_step(
     loss_mask = loss_mask[:, args.obs_len:]
 
     for _ in range(args.best_k):
-        # TODO add goal
-        generator_out = generator(obs_traj, obs_traj_rel, seq_start_end)
+        # Using final predicted ground truth point as goal point during training.
+        generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
 
         pred_traj_fake_rel = generator_out
         pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
@@ -500,7 +500,7 @@ def generator_step(
 
 
 def check_accuracy(
-    args, loader, generator, discriminator, d_loss_fn, limit=False
+        args, loader, generator, discriminator, d_loss_fn, limit=False
 ):
     d_losses = []
     metrics = {}
@@ -518,10 +518,8 @@ def check_accuracy(
              non_linear_ped, loss_mask, seq_start_end) = batch
             linear_ped = 1 - non_linear_ped
             loss_mask = loss_mask[:, args.obs_len:]
-            # TODO add goal
-            pred_traj_fake_rel = generator(
-                obs_traj, obs_traj_rel, seq_start_end
-            )
+            # Using final predicted ground truth point as goal point during training.
+            pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
             pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
 
             g_l2_loss_abs, g_l2_loss_rel = cal_l2_losses(
@@ -577,7 +575,7 @@ def check_accuracy(
         metrics['fde_l'] = 0
     if total_traj_nl != 0:
         metrics['ade_nl'] = sum(disp_error_nl) / (
-            total_traj_nl * args.pred_len)
+                total_traj_nl * args.pred_len)
         metrics['fde_nl'] = sum(f_disp_error_nl) / total_traj_nl
     else:
         metrics['ade_nl'] = 0
@@ -588,8 +586,8 @@ def check_accuracy(
 
 
 def cal_l2_losses(
-    pred_traj_gt, pred_traj_gt_rel, pred_traj_fake, pred_traj_fake_rel,
-    loss_mask
+        pred_traj_gt, pred_traj_gt_rel, pred_traj_fake, pred_traj_fake_rel,
+        loss_mask
 ):
     g_l2_loss_abs = l2_loss(
         pred_traj_fake, pred_traj_gt, loss_mask, mode='sum'
@@ -608,7 +606,7 @@ def cal_ade(pred_traj_gt, pred_traj_fake, linear_ped, non_linear_ped):
 
 
 def cal_fde(
-    pred_traj_gt, pred_traj_fake, linear_ped, non_linear_ped
+        pred_traj_gt, pred_traj_fake, linear_ped, non_linear_ped
 ):
     fde = final_displacement_error(pred_traj_fake[-1], pred_traj_gt[-1])
     fde_l = final_displacement_error(
@@ -618,7 +616,6 @@ def cal_fde(
         pred_traj_fake[-1], pred_traj_gt[-1], non_linear_ped
     )
     return fde, fde_l, fde_nl
-
 
 
 if __name__ == '__main__':
