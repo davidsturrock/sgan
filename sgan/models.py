@@ -598,7 +598,7 @@ class TrajectoryDiscriminator(nn.Module):
         Output:
         - scores: Tensor of shape (batch,) with real/fake scores
         """
-        #TODO fix broken return_c flag in encoder
+        # TODO fix broken return_c flag in encoder
         final_h, _ = self.encoder(traj_rel)
         # Note: In case of 'global' option we are using start_pos as opposed to
         # end_pos. The intution being that hidden state has the whole
@@ -644,7 +644,7 @@ class IntentionForceGenerator(nn.Module):
         self.decoder = Decoder(
             pred_len,
             embedding_dim=embedding_dim,
-            h_dim=decoder_h_dim//2,
+            h_dim=decoder_h_dim // 2,
             mlp_dim=mlp_dim,
             num_layers=num_layers,
             pool_every_timestep=pool_every_timestep,
@@ -683,7 +683,7 @@ class IntentionForceGenerator(nn.Module):
             goal_point = torch.zeros((1, batch, 2), device=self.device)
             # obs_traj[-1].reshape(1, batch, 2)
         final_encoder_h = torch.cat([final_encoder_h, goal_point], dim=2)
-        #Pad cell tensor with zeros to make dims of h and c equal which is needed by decoder's input
+        # Pad cell tensor with zeros to make dims of h and c equal which is needed by decoder's input
         final_encoder_c = torch.cat([final_encoder_c, torch.zeros((1, batch, 2), device=self.device)], dim=2)
         # final_encoder_c = torch.cat([final_encoder_c, goal_point], dim=2)
         # print(f'final_h shape with goal: {final_encoder_h.size()}')
@@ -701,3 +701,30 @@ class IntentionForceGenerator(nn.Module):
         pred_traj_fake_rel, final_decoder_h = decoder_out
 
         return pred_traj_fake_rel
+
+
+class CombinedGenerator(nn.Module):
+    def __init__(
+            self, obs_len, pred_len, embedding_dim=64, encoder_h_dim=64,
+            decoder_h_dim=128, mlp_dim=1024, num_layers=1, noise_dim=(0,),
+            noise_type='gaussian', noise_mix_type='ped', pooling_type=None,
+            pool_every_timestep=True, dropout=0.0, bottleneck_dim=1024,
+            activation='relu', batch_norm=True, neighborhood_size=2.0, grid_size=8
+    ):
+        super(CombinedGenerator, self).__init__()
+        self.social = TrajectoryGenerator(obs_len, pred_len, embedding_dim, encoder_h_dim,
+                                          decoder_h_dim, mlp_dim, num_layers, noise_dim,
+                                          noise_type, noise_mix_type, pooling_type,
+                                          pool_every_timestep, dropout, bottleneck_dim,
+                                          activation, batch_norm, neighborhood_size, grid_size)
+
+        self.goal = IntentionForceGenerator(obs_len, pred_len, embedding_dim, encoder_h_dim,
+                                            decoder_h_dim, mlp_dim, num_layers, dropout, bottleneck_dim,
+                                            activation, batch_norm, neighborhood_size, grid_size, pooling_type,
+                                            pool_every_timestep)
+
+    def forward(self, obs_traj, obs_traj_rel, seq_start_end, goal_point=None):
+        social_traj = self.social(obs_traj, obs_traj_rel, seq_start_end)
+        goal_traj = self.goal(obs_traj, obs_traj_rel, seq_start_end, goal_point)
+        # For now take average of the social and goal generators outputs as the final traj
+        return (social_traj + goal_traj) / 2
