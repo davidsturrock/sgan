@@ -56,53 +56,53 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
         star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
                                   markersize=5, label='Pred_traj_fake')
         ax.legend(handles=[dot_line, x_line, star_line])
+        # if e - s > 3:
+        #     save_file = pathlib.Path('/home/david/Pictures/plots/sgan/BatchOneGoalChosen') / f'seq_{i}.png'
+        #     save_file.parent.mkdir(exist_ok=True, parents=True)
+        #     plt.savefig(save_file, bbox_inches='tight')
         plt.show()
         plt.waitforbuttonpress()
         plt.close(fig)
 
 
-def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end, agent_idx):
-    # print(seq_start_end)
-    # chosen = random.randint(0, len(seq_start_end))
-    for k, (s, e) in enumerate(seq_start_end[:, :]):
-        # if k != agent_idx:
-        #     continue
-        if not (s <= agent_idx < e):
-            continue
+def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
+    for i, (s, e) in enumerate(seq_start_end[::, ::]):
+        # print(f'i {i}, s {s},e {e}')
         cmap = list(mcolours.TABLEAU_COLORS.keys())
         if len(cmap) < e - s:
             cmap = list(mcolours.CSS4_COLORS.keys())
         fig, ax = plt.subplots()
-        # print(f's {s}, e {e}')
+
+
         for j in range(s, e):
             colour = cmap.pop(0)
-            # try:
-            #     colour = cmap[j-s]
-            # except IndexError:
-            # print(f'j-s {j} - {s} = {j-s}')
-
-            l1 = ax.plot(obs_traj_abs[:, j, 0], obs_traj_abs[:, j, 1], c=colour, linestyle='', marker='.')
+            l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
+                         linestyle='', marker='.')
             l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
-            l3 = ax.plot(pred_traj_fake_abs[:, j, 0], pred_traj_fake_abs[:, j, 1], c=colour, linestyle='', marker='*')
-        plt.axis('square')
-        # ax.set_ylim([0, 10])
-        # ax.set_xlim([0, 10])
-        plt.title(f'Trajectories in Seq {k}')
+            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], c=colour, linestyle='',
+                         marker='*')
 
+        plt.title(f'Goal Pt {title.split("/")[1]}')
+        plt.axis('square')
         ax.set_xlabel('X [m]')
         ax.set_ylabel('Y [m]')
-
         plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.', markersize=5, label='Obs_traj')
+        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
+                                 markersize=5, label='Obs_traj')
         x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
                                markersize=5, label='Pred_traj_gt')
-        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*', markersize=5, label='Pred_traj_fake')
-
-        ax.legend(handles=[dot_line, star_line])
-        save_file = pathlib.Path('/home/david/Pictures/plots/inference exps') / f'{title}_seq_{k}.png'
+        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
+                                  markersize=5, label='Pred_traj_fake')
+        ax.legend(handles=[dot_line, x_line, star_line])
+        xlim = [-10, 15]
+        ax.set_xlim(xlim)
+        ylim = [-20, 5]
+        ax.set_ylim(ylim)
+        save_file = pathlib.Path('/home/david/Pictures/plots/sgan/BatchOneGoalChosen') / f'{title}_seq_{i}.png'
         save_file.parent.mkdir(exist_ok=True, parents=True)
-        plt.savefig(save_file, bbox_inches='tight')
-        plt.close()
+
+        plt.savefig(save_file)
+        plt.close(fig)
 
 
 def int_tuple(s):
@@ -193,31 +193,53 @@ def relative_to_abs(rel_traj, start_pos):
     return abs_traj.permute(1, 0, 2)
 
 
-def plot_losses(checkpoint):
+def plot_losses(checkpoint, train:bool=True):
+    key = 'train' if train else 'val'
     # g_losses = checkpoint['G_losses']['G_total_loss']
-    g_losses = checkpoint['metrics_train']['g_l2_loss_rel']
+    g_losses = checkpoint[f'metrics_{key}']['g_l2_loss_rel']
     # d_losses = checkpoint['D_losses']['D_total_loss']
-    d_losses = checkpoint['metrics_train']['d_loss']
-    print(checkpoint['metrics_train'].keys())
-    fde = checkpoint['metrics_train']['fde']
-    ade = checkpoint['metrics_train']['ade']
-    fig, ax = plt.subplots()
+    d_losses = checkpoint[f'metrics_{key}']['d_loss']
+    # print(checkpoint['metrics_val'].keys())
+    fde = checkpoint[f'metrics_{key}']['fde']
+    ade = checkpoint[f'metrics_{key}']['ade']
+    fig, ax = plt.subplots(2, 2)
     # step = checkpoint['args']['checkpoint_every']
     # x_vals = list(range(0, len(g_losses) * step, step))
-    l1 = ax.plot(g_losses, 'g', linestyle='-', marker='.', markersize=0.1, label='Generator Losses')
-    l2 = ax.plot(d_losses, 'r', linestyle='-', marker='.', markersize=0.1, label='Discriminator Losses')
-    # l3 = ax.plot(fde, 'b', linestyle='-', marker='.', markersize=0.1, label='Train FDE')
-    # l4 = ax.plot(ade, 'c', linestyle='-', marker='.', markersize=0.1, label='Train ADE')
+    l1 = ax[0, 0].plot(g_losses, 'g', linestyle='-', marker='.', markersize=0.1, label='Generator Losses')
+    l2 = ax[0, 1].plot(d_losses, 'r', linestyle='-', marker='.', markersize=0.1, label='Discriminator Losses')
+    l3 = ax[1, 0].plot(fde, 'b', linestyle='-', marker='.', markersize=0.1, label=f'{key} FDE')
+    l4 = ax[1, 1].plot(ade, 'c', linestyle='-', marker='.', markersize=0.1, label=f'{key} ADE')
     # plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
     plt.title('Metrics Graph')
     # plt.axis('square')
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Loss')
+    for a in ax.flat:
+        a.set_xlabel('Epoch')
+        a.set_ylabel('Loss')
+        a.legend()
     # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-    ax.legend()
+
     plt.show()
     plt.waitforbuttonpress()
     plt.close(fig)
 
+def write_plots_to_video():
+    import cv2
+    import glob
+    import sys
+    directory = '/home/david/Pictures/plots/sgan/BatchOneGoalChosen/'
+    imgs = glob.glob(f'{directory}*.png')
+    imgs = sorted(imgs, key=lambda f: int(''.join(filter(str.isdigit, f))))
+    # print(*imgs, sep='\n')
+    # sys.exit(0)
+    imgs = [cv2.imread(img) for img in imgs]
 
+    height, width, layers = imgs[0].shape
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video = cv2.VideoWriter(f'{directory}plot.mp4', fourcc, 2.5, (width, height))
+
+    for img in imgs:
+        video.write(img)
+
+    cv2.destroyAllWindows()
+    video.release()
 
