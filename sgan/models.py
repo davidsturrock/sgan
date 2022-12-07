@@ -96,7 +96,7 @@ class Decoder(nn.Module):
         self.pool_every_timestep = pool_every_timestep
 
         self.decoder = nn.LSTM(
-            embedding_dim, h_dim, num_layers, dropout=dropout
+            embedding_dim, self.h_dim, num_layers, dropout=dropout
         )
 
         if pool_every_timestep:
@@ -120,7 +120,7 @@ class Decoder(nn.Module):
                     grid_size=grid_size
                 )
 
-            mlp_dims = [h_dim + bottleneck_dim, mlp_dim, h_dim]
+            mlp_dims = [self.h_dim + bottleneck_dim, mlp_dim, self.h_dim]
             self.mlp = make_mlp(
                 mlp_dims,
                 activation=activation,
@@ -129,7 +129,7 @@ class Decoder(nn.Module):
             )
 
         self.spatial_embedding = nn.Linear(2, embedding_dim)
-        self.hidden2pos = nn.Linear(h_dim, 2)
+        self.hidden2pos = nn.Linear(self.h_dim, 2)
 
     def forward(self, last_pos, last_pos_rel, state_tuple, seq_start_end):
         """
@@ -147,7 +147,10 @@ class Decoder(nn.Module):
         # decoder_input = decoder_input.view(1, batch, self.embedding_dim)
         decoder_input = decoder_input.reshape(1, batch, self.embedding_dim)
         for _ in range(self.seq_len):
+            # print(f'Decoder input shape:{decoder_input.shape},')
+            # print(f'cell shape:{state_tuple[1].shape}, hidden shape {state_tuple[0].shape}')
             output, state_tuple = self.decoder(decoder_input, state_tuple)
+
             rel_pos = self.hidden2pos(output.reshape(-1, self.h_dim))
             curr_pos = rel_pos + last_pos
 
@@ -378,6 +381,7 @@ class TrajectoryGenerator(nn.Module):
             num_layers=num_layers,
             dropout=dropout
         )
+        self.encoder.to(self.device)
 
         self.decoder = Decoder(
             pred_len,
@@ -394,6 +398,7 @@ class TrajectoryGenerator(nn.Module):
             grid_size=grid_size,
             neighborhood_size=neighborhood_size
         )
+        self.decoder.to(self.device)
 
         if pooling_type == 'pool_net':
             self.pool_net = PoolHiddenNet(
@@ -503,7 +508,7 @@ class TrajectoryGenerator(nn.Module):
         """
         batch = obs_traj_rel.size(1)
         # Encode seq
-        final_encoder_h = self.encoder(obs_traj_rel)
+        final_encoder_h, final_encoder_c = self.encoder(obs_traj_rel)
         # Pool States
         if self.pooling_type:
             end_pos = obs_traj[-1, :, :]
@@ -652,7 +657,7 @@ class IntentionForceGenerator(nn.Module):
             neighborhood_size=neighborhood_size
         )
 
-    def forward(self, obs_traj, obs_traj_rel, seq_start_end):
+    def forward(self, obs_traj, obs_traj_rel, seq_start_end, goal_point=None):
         """
         Inputs:
         - obs_traj: Tensor of shape (obs_len, batch, 2)
@@ -664,15 +669,29 @@ class IntentionForceGenerator(nn.Module):
         - pred_traj_rel: Tensor of shape (self.pred_len, batch, 2)
         """
         batch = obs_traj_rel.size(1)
+        # print(f'batch size: {batch}')
+        # print(f'obs_traj_rel: {obs_traj_rel.shape}')
         # Encode seq
         final_encoder_h, final_encoder_c = self.encoder(obs_traj_rel, )
         # print(f'final_h shape: {final_encoder_h.size()}\n'
         #       f'final_c shape: {final_encoder_c.size()}')
+
+        # Goal injection ala naviGAN
+        torch.set_printoptions(precision=2)
+        # print(f'End point sample: {obs_traj[-1, 0: 10]}')
+        if goal_point is None:
+            goal_point = torch.zeros((1, batch, 2), device=self.device)
+            # obs_traj[-1].reshape(1, batch, 2)
+        final_encoder_h = torch.cat([final_encoder_h, goal_point], dim=2)
+        #Pad cell tensor with zeros to make dims of h and c equal which is needed by decoder's input
+        final_encoder_c = torch.cat([final_encoder_c, torch.zeros((1, batch, 2), device=self.device)], dim=2)
+        # final_encoder_c = torch.cat([final_encoder_c, goal_point], dim=2)
+        # print(f'final_h shape with goal: {final_encoder_h.size()}')
         state_tuple = (final_encoder_h, final_encoder_c)
         last_pos = obs_traj[-1]
         last_pos_rel = obs_traj_rel[-1]
-        # Predict Trajectory
 
+        # Predict Trajectory
         decoder_out = self.decoder(
             last_pos,
             last_pos_rel,
