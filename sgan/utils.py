@@ -78,27 +78,29 @@ def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_a
             colour = cmap.pop(0)
             l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
                          linestyle='', marker='.')
-            l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
-            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], c=colour, linestyle='',
+            # l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
+            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], markersize=3, c=colour, linestyle='',
                          marker='*')
 
-        plt.title(f'Goal Pt {title.split("/")[1]}')
+        # plt.title(f'Goal Pt {title.split("/")[1]}')
+        plt.title(f'Goal Pt {title}')
         plt.axis('square')
         ax.set_xlabel('X [m]')
         ax.set_ylabel('Y [m]')
         plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
         dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
                                  markersize=5, label='Obs_traj')
-        x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
-                               markersize=5, label='Pred_traj_gt')
+        # x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
+        #                        markersize=5, label='Pred_traj_gt')
         star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
                                   markersize=5, label='Pred_traj_fake')
-        ax.legend(handles=[dot_line, x_line, star_line])
-        xlim = [-10, 15]
+        # ax.legend(handles=[dot_line, x_line, star_line])
+        # ax.legend(handles=[dot_line, star_line])
+        xlim = [-5,15]
         ax.set_xlim(xlim)
-        ylim = [-20, 5]
+        ylim = [-10,10]
         ax.set_ylim(ylim)
-        save_file = pathlib.Path('/home/david/Pictures/plots/sgan/BatchOneGoalChosen') / f'{title}_seq_{i}.png'
+        save_file = pathlib.Path('/home/david/Pictures/plots/sgan/navigan') / f'{title}_seq_{i}.png'
         save_file.parent.mkdir(exist_ok=True, parents=True)
 
         plt.savefig(save_file)
@@ -191,6 +193,18 @@ def relative_to_abs(rel_traj, start_pos):
     start_pos = torch.unsqueeze(start_pos, dim=1)
     abs_traj = displacement + start_pos
     return abs_traj.permute(1, 0, 2)
+
+
+def abs_to_relative(abs_traj):
+    """
+    Convert absolute tensor to a relative. First values are taken as zero to preserve input shape
+    Inputs:
+    - abs_traj: pytorch tensor of shape (seq_len, batch, 2)
+    Outputs:
+    - rel_traj: pytorch tensor of shape (seq_len, batch, 2)
+    """
+    return torch.cat([torch.zeros((1, abs_traj.shape[1], 2)), torch.diff(abs_traj, dim=0)])
+    # return torch.diff(abs_traj, dim=0)
 
 
 def plot_losses(checkpoint, train:bool=True):

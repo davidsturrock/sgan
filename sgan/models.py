@@ -723,8 +723,8 @@ class CombinedGenerator(nn.Module):
                                             activation, batch_norm, neighborhood_size, grid_size, pooling_type,
                                             pool_every_timestep)
 
-    def forward(self, obs_traj, obs_traj_rel, seq_start_end, goal_point=None):
+    def forward(self, obs_traj, obs_traj_rel, seq_start_end, goal_point=None, goal_aggro=0.5):
         social_traj = self.social(obs_traj, obs_traj_rel, seq_start_end)
         goal_traj = self.goal(obs_traj, obs_traj_rel, seq_start_end, goal_point)
         # For now take average of the social and goal generators outputs as the final traj
-        return (social_traj + goal_traj) / 2
+        return ((1 - goal_aggro) * social_traj + goal_aggro * goal_traj) / 2
