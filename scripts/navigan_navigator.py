@@ -6,9 +6,9 @@ import torch
 from scripts.model_loaders import get_combined_generator
 from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative
 
-# sys.path.insert(0, '/home/administrator/code/aru-core/build/lib')
-# sys.path.insert(0, '/home/administrator/code/aru_sil_py')
-sys.path.insert(0, '/home/david/code/aru-core/build/lib')
+sys.path.insert(0, '/home/administrator/code/aru-core/build/lib')
+sys.path.insert(0, '/home/administrator/code/sgan')
+# sys.path.insert(0, '/home/david/code/aru-core/build/lib')
 sys.path.insert(0, '/')
 sys.path.insert(0, '/usr/local/lib/python3.6/dist-packages/cv2/python-3.6')
 import numpy as np
@@ -16,7 +16,7 @@ import rospy
 import std_msgs
 from geometry_msgs.msg import Twist, Point
 import aru_py_logger
-from aru_sil_py.utilities.Transform import distance_and_yaw_from_transform
+from utilities.Transform import distance_and_yaw_from_transform
 
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

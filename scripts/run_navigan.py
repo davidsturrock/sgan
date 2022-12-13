@@ -3,13 +3,13 @@ import time
 import numpy as np
 import rospy
 import sys
-
+sys.path.insert(0, '/home/administrator/code/aru_sil_py/navigation/__init__.py')
 import argparse
 import os
 import torch
-from aru_sil_py.navigation.nav_options import NavOptions
+from navigation.nav_options import NavOptions
 from navigan_navigator import Navigator
-from aru_sil_py.utilities.Transform import distance_and_yaw_from_transform
+from utilities.Transform import distance_and_yaw_from_transform
 from attrdict import AttrDict
 from pathlib import Path
 
