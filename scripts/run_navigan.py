@@ -41,20 +41,22 @@ def main(args):
     tfs = [tf for _ in range(8)]
     obs_traj = make_scene(count, tf, tf1, tfs)
     nav.obs_traj = obs_traj
-
+    while not nav.callback_status:
+        pass
     while not rospy.is_shutdown():
         # start = time.perf_counter()
         x, y = (t.item() for t in obs_traj[-1, 0])
-        pred, pred_rel = nav.seek_live_goal(x=x + 20, y=y + 20, title=f'Loop iteration {count}')
+        pred, pred_rel = nav.seek_live_goal(x=20, y=0, title=f'Loop iteration {count}')
         goal_tfs = pts_to_tfs(pred_rel)
         nav.goal_step(goal_tfs[0])
-        print(f"Goal pt: {x + 20:.2f}, {y + 20:.2f}")
+        # print(goal_tfs[0])
+        # print(f"Goal pt: {x + 20:.2f}, {y + 20:.2f}")
         # nav.obs_traj = update_scene(obs_traj, count, tf, tf1, tfs, pred)
         count += 1
         nav.sleep()
         # print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
-        if count >= 25:
-            sys.exit(0)
+        # if count >= 25:
+        #     sys.exit(0)
 
 
 def make_scene(count, tf, tf1, tfs):

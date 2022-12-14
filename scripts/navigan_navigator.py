@@ -1,3 +1,4 @@
+import math
 import pathlib
 import time
 import sys
@@ -16,7 +17,7 @@ from geometry_msgs.msg import Twist, Point
 import aru_py_logger
 from utilities.Transform import distance_and_yaw_from_transform
 from nav_msgs.msg import Odometry
-
+from scipy.spatial.transform import Rotation as R
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -50,6 +51,8 @@ def create_tf_logger(logfolder=pathlib.Path('logs'), logname=None,
 class Navigator:
 
     def __init__(self, args, model_path, agents=10, rate=1):
+        self.callback_status = False
+        self.odom = None
         if pathlib.Path(model_path).exists():
             checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
         else:
@@ -79,10 +82,31 @@ class Navigator:
         self.rate.sleep()
 
     def goal_step(self, tf):
-        distance, yaw = distance_and_yaw_from_transform(tf)
-        if distance < self.control_params.dthresh and abs(yaw) < self.control_params.ythresh:
-            msg = self.controller(tf)
-            self.publisher.publish(msg)
+        with np.printoptions(precision=2, suppress=True):
+            # print(f'Initial TF:\n{tf}')
+            x = tf[2,3]
+            curr_x = self.odom.pose.position.x
+            curr_y = self.odom.pose.position.y
+            rot_mat = R.from_matrix(tf[0:3, 0:3])
+            # turn_angle = math.atan2(curr_y, curr_x) * 180 / math.pi
+            tf_turn_angle = rot_mat.as_euler('zyx', degrees=True)[0]
+            # print(f"TF yaw {tf_turn_angle:.2f}")
+
+            quat = self.odom.pose.orientation
+            pose = R.from_quat([quat.x, quat.y, quat.z, quat.w])
+            curr_yaw = pose.as_euler('zyx', degrees=True)[0]
+            # print(f'Final turn angle: = {tf_turn_angle:.2f} - {curr_yaw:.2f} = {tf_turn_angle - curr_yaw:.2f}')
+            # # print(f'Turn angle for ({y - curr_y:.2f}, {x - curr_x:.2f}): {turn_angle:.2f} deg.')
+            turn_angle = curr_yaw - tf_turn_angle
+            r = R.from_euler('z', turn_angle, degrees=True)
+            rot = np.array(r.as_matrix())
+            tf = np.eye(4)
+            tf[0:3, 0:3] = rot
+            tf[2,3] = x
+            # print(f'New TF:\n{tf}')
+            if x < self.control_params.dthresh and abs(turn_angle) < self.control_params.ythresh:
+                msg = self.controller(tf)
+                self.publisher.publish(msg)
 
     def controller(self, tf):
         """Controller now assumes TF is within bounds. Check must be performed at higher level"""
@@ -93,7 +117,10 @@ class Navigator:
         #  Invert for ORB to give correct left and right action (could also just flip sign of yaw)
         # tf = np.linalg.inv(tf)
         distance, yaw = distance_and_yaw_from_transform(tf)
+        pose = R.from_matrix(tf[0:3,0:3])
+        yaw = pose.as_euler('zyx', degrees=True)[0]
         yaw = -yaw
+        # print(f'Controller yaw: {yaw:.2f}')
         # print(f'Yaw: {yaw} deg.')
         # if logging, log the tf for path tracking purposes
         if self.logger is not None:
@@ -115,9 +142,10 @@ class Navigator:
     def callback(self, tracked_pts: Odometry):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
+        self.odom = tracked_pts.pose
         if 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
             return
-        print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
+        # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
             # Slide all points fwd a timestep
         self.obs_traj[:-1] = self.obs_traj.clone()[1:]
         # From agent 0 (Husky) to agent 9 update
@@ -128,6 +156,7 @@ class Navigator:
         #     self.obs_traj[-1, i, 0] = pt[0]
         #     self.obs_traj[-1, i, 1] = pt[1]
         self.last_callback = time.perf_counter()
+        self.callback_status = True
 
     def seek_live_goal(self, x, y, agent_id=0, title='live_exp'):
         with torch.no_grad():
@@ -151,7 +180,7 @@ class Navigator:
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
 
-            save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+            # save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
         # for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:
         #         print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')
