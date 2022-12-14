@@ -237,14 +237,14 @@ def plot_losses(checkpoint, train: bool = True):
     plt.close(fig)
 
 
-def write_plots_to_video():
+def write_plots_to_video(directory='/home/administrator/code/sgan/plots/'):
     import cv2
     import glob
     import sys
-    directory = '/home/david/Pictures/plots/sgan/BatchOneGoalChosen/'
     imgs = glob.glob(f'{directory}*.png')
     imgs = sorted(imgs, key=lambda f: int(''.join(filter(str.isdigit, f))))
     # print(*imgs, sep='\n')
+
     # sys.exit(0)
     imgs = [cv2.imread(img) for img in imgs]
 

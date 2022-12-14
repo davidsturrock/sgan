@@ -18,6 +18,7 @@ import aru_py_logger
 from utilities.Transform import distance_and_yaw_from_transform
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
+
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -51,6 +52,8 @@ def create_tf_logger(logfolder=pathlib.Path('logs'), logname=None,
 class Navigator:
 
     def __init__(self, args, model_path, agents=10, rate=1):
+        self.goal = None
+        self.goal_status = False
         self.callback_status = False
         self.odom = None
         if pathlib.Path(model_path).exists():
@@ -76,6 +79,7 @@ class Navigator:
         self.rate_value = rate
         self.rate = rospy.Rate(self.rate_value)
         self.odom_sub = rospy.Subscriber('/odometry/filtered', Odometry, self.callback)
+        self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
         self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
 
     def sleep(self):
@@ -84,7 +88,7 @@ class Navigator:
     def goal_step(self, tf):
         with np.printoptions(precision=2, suppress=True):
             # print(f'Initial TF:\n{tf}')
-            x = tf[2,3]
+            x = tf[2, 3]
             curr_x = self.odom.pose.position.x
             curr_y = self.odom.pose.position.y
             rot_mat = R.from_matrix(tf[0:3, 0:3])
@@ -102,7 +106,7 @@ class Navigator:
             rot = np.array(r.as_matrix())
             tf = np.eye(4)
             tf[0:3, 0:3] = rot
-            tf[2,3] = x
+            tf[2, 3] = x
             # print(f'New TF:\n{tf}')
             if x < self.control_params.dthresh and abs(turn_angle) < self.control_params.ythresh:
                 msg = self.controller(tf)
@@ -117,7 +121,7 @@ class Navigator:
         #  Invert for ORB to give correct left and right action (could also just flip sign of yaw)
         # tf = np.linalg.inv(tf)
         distance, yaw = distance_and_yaw_from_transform(tf)
-        pose = R.from_matrix(tf[0:3,0:3])
+        pose = R.from_matrix(tf[0:3, 0:3])
         yaw = pose.as_euler('zyx', degrees=True)[0]
         yaw = -yaw
         # print(f'Controller yaw: {yaw:.2f}')
@@ -146,7 +150,7 @@ class Navigator:
         if 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
             return
         # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
-            # Slide all points fwd a timestep
+        # Slide all points fwd a timestep
         self.obs_traj[:-1] = self.obs_traj.clone()[1:]
         # From agent 0 (Husky) to agent 9 update
         # x and y coordinate from object tracker
@@ -158,6 +162,12 @@ class Navigator:
         self.last_callback = time.perf_counter()
         self.callback_status = True
 
+    def goal_callback(self, goal: Point):
+        """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
+        # limit update rate to self.rate_value
+        self.goal = goal
+        self.goal_status = True
+
     def seek_live_goal(self, x, y, agent_id=0, title='live_exp'):
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
@@ -167,8 +177,11 @@ class Navigator:
             with np.printoptions(precision=3, suppress=True):
                 goal_state = torch.zeros((1, self.obs_traj.shape[1], 2), device=_DEVICE_)
                 # goal_state[0, agent_id] = pred_traj_gt[-1, agent_id]
-                goal_state[0, agent_id, 0] = x
-                goal_state[0, agent_id, 1] = y
+                # goal_state[0, agent_id, 0] = x
+                print(self.goal)
+                goal_state[0, agent_id, 0] = self.goal.x
+                # goal_state[0, agent_id, 1] = y
+                goal_state[0, agent_id, 1] = self.goal.y
                 # print(goal_state.shape)
 
             ota = self.obs_traj.numpy()

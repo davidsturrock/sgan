@@ -73,8 +73,13 @@ def main(args):
     # nav.obs_traj = torch.zeros((8, 1, 2))
     while not nav.callback_status:
         pass
+    print('Wheel Odom received')
     while False in np.all([nav.obs_traj[::, 0].numpy()], axis=0):
         pass
+    print('8 points observed.')
+    while not nav.goal_status:
+        pass
+    print('Goal received')
     # print(nav.obs_traj[::, 0].T)
     # print()
     # sys.exit(0)
