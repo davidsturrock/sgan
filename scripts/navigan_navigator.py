@@ -181,12 +181,12 @@ class Navigator:
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
 
             save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
-        # for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
+        # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:
         #         print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')
-        # for i, ped in enumerate(pred_traj_gt.permute(1, 0, 2)):
+        # for i, ped in enumerate(ptfa.permute(1, 0, 2)):
         #     if i == agent_id:
-        #         print(f'Ped {i} predicted gt\tX\n\t\t\t\t\tY\n{ped.T}')
+        #         print(f'Ped {i} predicted\tX\n\t\t\t\t\tY\n{ped.T}')
         return ptfa, pred_traj_fake_rel
 
 

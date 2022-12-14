@@ -61,8 +61,8 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
         #     save_file.parent.mkdir(exist_ok=True, parents=True)
         #     plt.savefig(save_file, bbox_inches='tight')
         plt.show()
-        plt.waitforbuttonpress()
-        plt.close(fig)
+        # plt.waitforbuttonpress()
+        plt.close()
 
 
 def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
@@ -73,13 +73,13 @@ def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_a
             cmap = list(mcolours.CSS4_COLORS.keys())
         fig, ax = plt.subplots()
 
-
         for j in range(s, e):
             colour = cmap.pop(0)
             l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
                          linestyle='', marker='.')
             # l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
-            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], markersize=3, c=colour, linestyle='',
+            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], markersize=3, c=colour,
+                         linestyle='',
                          marker='*')
 
         # plt.title(f'Goal Pt {title.split("/")[1]}')
@@ -96,9 +96,9 @@ def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_a
                                   markersize=5, label='Pred_traj_fake')
         # ax.legend(handles=[dot_line, x_line, star_line])
         # ax.legend(handles=[dot_line, star_line])
-        xlim = [-5,15]
+        xlim = [-5, 15]
         ax.set_xlim(xlim)
-        ylim = [-10,10]
+        ylim = [-10, 10]
         ax.set_ylim(ylim)
         save_file = pathlib.Path('/home/administrator/code/sgan/plots') / f'{title}_seq_{i}.png'
         save_file.parent.mkdir(exist_ok=True, parents=True)
@@ -207,7 +207,7 @@ def abs_to_relative(abs_traj):
     # return torch.diff(abs_traj, dim=0)
 
 
-def plot_losses(checkpoint, train:bool=True):
+def plot_losses(checkpoint, train: bool = True):
     key = 'train' if train else 'val'
     # g_losses = checkpoint['G_losses']['G_total_loss']
     g_losses = checkpoint[f'metrics_{key}']['g_l2_loss_rel']
@@ -236,6 +236,7 @@ def plot_losses(checkpoint, train:bool=True):
     plt.waitforbuttonpress()
     plt.close(fig)
 
+
 def write_plots_to_video():
     import cv2
     import glob
@@ -256,4 +257,3 @@ def write_plots_to_video():
 
     cv2.destroyAllWindows()
     video.release()
-
