@@ -16,7 +16,7 @@ from pathlib import Path
 from scripts.goal import seek_goal, seek_live_goal, create_obs_traj, pts_to_tfs
 from scripts.model_loaders import get_combined_generator
 from sgan.data.loader import data_loader
-from sgan.utils import get_dset_path
+from sgan.utils import get_dset_path, save_plot_trajectory
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
@@ -40,9 +40,7 @@ def main(args):
     tf1[0, 3] = 0.2
     tfs = [tf for _ in range(8)]
     obs_traj = make_scene(count, tf, tf1, tfs)
-    print(obs_traj.shape)
-    # sys.exit(0)
-    r = rospy.Rate(5)
+    nav.obs_traj = obs_traj
 
     while not rospy.is_shutdown():
         # start = time.perf_counter()
@@ -51,9 +49,9 @@ def main(args):
         goal_tfs = pts_to_tfs(pred_rel)
         nav.goal_step(goal_tfs[0])
         print(f"Goal pt: {x + 20:.2f}, {y + 20:.2f}")
-        nav.obs_traj = update_scene(obs_traj, count, tf, tf1, tfs, pred)
+        # nav.obs_traj = update_scene(obs_traj, count, tf, tf1, tfs, pred)
         count += 1
-        r.sleep()
+        nav.sleep()
         # print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
         if count >= 25:
             sys.exit(0)
@@ -61,6 +59,7 @@ def main(args):
 
 def make_scene(count, tf, tf1, tfs):
     obs_traj = create_obs_traj(tfs)
+
     other_ped = obs_traj.clone()
     other_ped[::, 0, 1] = other_ped[::, 0, 1] + 5
     obs_traj = torch.cat([obs_traj, other_ped], dim=1)

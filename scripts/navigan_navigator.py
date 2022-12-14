@@ -4,12 +4,10 @@ import sys
 import torch
 
 from scripts.model_loaders import get_combined_generator
-from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative
+from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative, plot_trajectories
 
 sys.path.insert(0, '/home/administrator/code/aru-core/build/lib')
-sys.path.insert(0, '/home/administrator/code/sgan')
 # sys.path.insert(0, '/home/david/code/aru-core/build/lib')
-sys.path.insert(0, '/')
 sys.path.insert(0, '/usr/local/lib/python3.6/dist-packages/cv2/python-3.6')
 import numpy as np
 import rospy
@@ -17,6 +15,7 @@ import std_msgs
 from geometry_msgs.msg import Twist, Point
 import aru_py_logger
 from utilities.Transform import distance_and_yaw_from_transform
+from nav_msgs.msg import Odometry
 
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -50,7 +49,7 @@ def create_tf_logger(logfolder=pathlib.Path('logs'), logname=None,
 
 class Navigator:
 
-    def __init__(self, args, model_path, agents=10):
+    def __init__(self, args, model_path, agents=10, rate=1):
         if pathlib.Path(model_path).exists():
             checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
         else:
@@ -70,7 +69,14 @@ class Navigator:
         self.control_params: ControlParameters = ControlParameters(args)
         rospy.init_node('naviganNavigator', anonymous=True)
 
+        self.last_callback = time.perf_counter()
+        self.rate_value = rate
+        self.rate = rospy.Rate(self.rate_value)
+        self.odom_sub = rospy.Subscriber('/odometry/filtered', Odometry, self.callback)
         self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
+
+    def sleep(self):
+        self.rate.sleep()
 
     def goal_step(self, tf):
         distance, yaw = distance_and_yaw_from_transform(tf)
@@ -106,15 +112,22 @@ class Navigator:
 
         return cmd_vel
 
-    def callback(self, tracked_pts: std_msgs.msg.Int32):
+    def callback(self, tracked_pts: Odometry):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
-        # Slide all points fwd a timestep
+        # limit update rate to self.rate_value
+        if 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
+            return
+        print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
+            # Slide all points fwd a timestep
         self.obs_traj[:-1] = self.obs_traj.clone()[1:]
         # From agent 0 (Husky) to agent 9 update
         # x and y coordinate from object tracker
-        for i, pt in enumerate(tracked_pts):
-            self.obs_traj[-1, i, 0] = pt[0]
-            self.obs_traj[-1, i, 1] = pt[1]
+        self.obs_traj[-1, 0, 0] = tracked_pts.pose.pose.position.x
+        self.obs_traj[-1, 0, 1] = tracked_pts.pose.pose.position.y
+        # for i, pt in enumerate(tracked_pts):
+        #     self.obs_traj[-1, i, 0] = pt[0]
+        #     self.obs_traj[-1, i, 1] = pt[1]
+        self.last_callback = time.perf_counter()
 
     def seek_live_goal(self, x, y, agent_id=0, title='live_exp'):
         with torch.no_grad():
@@ -131,7 +144,6 @@ class Navigator:
 
             ota = self.obs_traj.numpy()
             ptga = pred_traj_gt.numpy()
-
             pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, 1)
             start_pos = self.obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
