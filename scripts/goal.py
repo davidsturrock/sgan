@@ -4,7 +4,10 @@ import sys
 from pathlib import Path
 import numpy as np
 import cv2
+# Husky import style
 from utilities.VisualOdometry import generate_transform_path
+# David Laptop import style
+# from aru_sil_py.utilities.VisualOdometry import generate_transform_path
 import torch
 
 from sgan.utils import relative_to_abs, save_plot_trajectory, plot_trajectories, abs_to_relative

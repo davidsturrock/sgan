@@ -5,7 +5,7 @@ import sys
 import torch
 
 from scripts.model_loaders import get_combined_generator
-from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative, plot_trajectories, live_plotter
+from sgan.utils import relative_to_abs, abs_to_relative, Plotter
 
 sys.path.insert(0, '/home/administrator/code/aru-core/build/lib')
 # sys.path.insert(0, '/home/david/code/aru-core/build/lib')
@@ -16,6 +16,7 @@ import std_msgs
 from geometry_msgs.msg import Twist, Point
 import aru_py_logger
 from utilities.Transform import distance_and_yaw_from_transform
+# from aru_sil_py.utilities.Transform import distance_and_yaw_from_transform
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 
@@ -52,6 +53,7 @@ def create_tf_logger(logfolder=pathlib.Path('logs'), logname=None,
 class Navigator:
 
     def __init__(self, args, model_path, agents=10, rate=1):
+        self.plotter = Plotter()
         self.goal = None
         self.goal_status = False
         self.callback_status = False
@@ -168,7 +170,7 @@ class Navigator:
         self.goal = goal
         self.goal_status = True
 
-    def seek_live_goal(self, x, y, first, agent_id=0, title='live_exp'):
+    def seek_live_goal(self, agent_id=0, title='live_exp'):
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
             obs_traj_rel = abs_to_relative(self.obs_traj)
@@ -192,8 +194,8 @@ class Navigator:
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-            live_plotter(title, ota, ptga, ptfa, seq_start_end, first=first)
-            # save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+            self.plotter.display(title=f'x: {self.goal.x}m y: {self.goal.y}m', ota=ota, ptfa=ptfa, sse=seq_start_end)
+
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:
         #         print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')
