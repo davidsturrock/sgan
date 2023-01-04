@@ -71,7 +71,7 @@ def seek_goal(dpath, loader, generator, agent_id=0, iters=50, x=7, y=14):
                     for filename in Path(dpath).rglob('*'):
                         data = read_file(filename)
 
-                        goal_state[0, i] = get_goal_point(data, generator, last_obs)
+                        goal_state[0, i] = get_goal_point(data, generator.goal.pred_len, last_obs)
 
             continue
             # if obs_traj.shape[1] > 3:
@@ -124,7 +124,6 @@ def count_suitable_target_agents_in_dataset(dpath, loader, generator):
     good_agents = 0
     with torch.no_grad():
         for i, batch in enumerate(loader):
-
 
             (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
              non_linear_ped, loss_mask, seq_start_end) = batch
@@ -218,7 +217,7 @@ def pts_to_tfs(pred_traj_fake_rel):
     return np.array(tfs)
 
 
-def get_goal_point(data, generator, last_obs):
+def get_goal_point(data, pred_len, last_obs):
     x, y = (t.item() for t in last_obs)
     xmask = np.isclose(data[::, 2], x, atol=0.005)
     ymask = np.isclose(data[::, 3], y, atol=0.005)
@@ -253,7 +252,7 @@ def get_goal_point(data, generator, last_obs):
     # If the goal index is within dataset size and the agent id of the goal
     # line matches the matching line
 
-    if subset[frames_w_agent].shape[0] - 1 > 3 * generator.goal.pred_len:
+    if subset[frames_w_agent].shape[0] - 1 > 3 * pred_len:
         print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
         # print(f'Matching line: {data[match_idx]}')
         # print(f'3*pred_len line: {data[goal_idx]}')
@@ -261,6 +260,48 @@ def get_goal_point(data, generator, last_obs):
     else:
         # print('Could not find 3*pred_len goal')
         return torch.zeros((1, 2), device=_DEVICE_)
+
+
+def create_goal_state(dpath, pred_len, obs_traj):
+    for filename in Path(dpath).rglob('*'):
+        data = read_file(filename)
+
+    goal_state = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
+    last_obs = obs_traj[-1, 0]
+    match_idx = get_match_idx(data, last_obs)
+    if len(match_idx) == 0:
+        return goal_state
+
+    if len(match_idx) > 1:
+        match_idx = get_closest_match(data, last_obs, match_idx)
+    else:
+        match_idx = match_idx[0]
+
+    agent_id = data[match_idx, 1]
+
+    subset = data[match_idx::]
+    frames_w_agent = np.argwhere(subset[::, 1] == agent_id)
+
+    agent_final_frame = subset[frames_w_agent][-1]
+    goal_idx = int(np.argwhere(np.all(data == agent_final_frame, axis=1)))
+
+    # If the goal index is within dataset size and the agent id of the goal
+    # line matches the matching line
+    if subset[frames_w_agent].shape[0] - 1 > 3 * pred_len:
+        print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
+        goal_state[0, 0] = torch.tensor(data[goal_idx, 2:])
+        print(goal_state)
+        sys.exit(0)
+    return goal_state
+
+
+def get_match_idx(data, last_obs):
+    x, y = (t.item() for t in last_obs)
+    xmask = np.isclose(data[::, 2], x, atol=0.005)
+    ymask = np.isclose(data[::, 3], y, atol=0.005)
+    x_idxs = np.argwhere(xmask)
+    y_idxs = np.argwhere(ymask)
+    return np.intersect1d(x_idxs, y_idxs)
 
 
 def goal_point_exists(data, generator, last_obs):
