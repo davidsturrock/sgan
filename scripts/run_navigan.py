@@ -3,6 +3,7 @@ import time
 import numpy as np
 import rospy
 import sys
+
 sys.path.insert(0, '/home/administrator/code/aru_sil_py/navigation/__init__.py')
 import argparse
 import os
@@ -15,18 +16,19 @@ from pathlib import Path
 
 from scripts.goal import pts_to_tfs
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
 parser.add_argument('--num_samples', default=20, type=int)
 parser.add_argument('--dset_type', default='test', type=str)
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 def main(args):
     # ----------------------------------------------
     # Navigator setup
     nav_args = NavOptions().parse()
-    nav = Navigator(nav_args, args.model_path, agents=1, rate=15)
+    nav = Navigator(nav_args, args.model_path, agents=1, rate=1)
+
     # -----------------------------------------------
     count = 0
     tf = np.eye(4)
@@ -60,9 +62,11 @@ def main(args):
         count += 1
         nav.sleep()
         print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
-        # if count >= 1:
-        #     sys.exit(0)
+        # if count > 10:
 
+        # if count >= 2:
+        #     nav.plotter.save_video()
+        #     sys.exit(0)
 
 
 if __name__ == '__main__':

@@ -108,7 +108,7 @@ def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_a
 
 
 class Plotter:
-    def __init__(self, xlim=None, ylim=None, save=True):
+    def __init__(self, xlim=None, ylim=None, save=False):
         self.save = save
         self.ylim = [-10, 10] if ylim is None else ylim
         self.xlim = [-5, 15] if xlim is None else xlim
@@ -122,9 +122,8 @@ class Plotter:
 
         # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
-    def display(self, title, ota, ptfa, sse, save_name='live_plot', save_dir='/home/david/data'):
+    def display(self, title, ota, ptfa, sse, save_name='live_plot', save_dir=' /home/administrator/code/sgan/plots'):
         """
-        /home/administrator/code/sgan/plots'
         ota: observed_trajector_absolute
         ptfa: predicted_trajectory_fake_absolute
         see: sequence_start_end
@@ -141,14 +140,16 @@ class Plotter:
         for s, e in sse[::, ::]:
             for j in range(s, e):
                 self.ax.scatter(ota[-1, j, 0], ota[-1, j, 1], c="r", marker=".", zorder=10, label='live location')
-                self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*', label='planned path')
+                self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*', markersize=2,label='planned path')
 
-            self.ax.plot(self.prev_x, self.prev_y, linestyle='', marker='.', markersize=1, c='dimgrey')
+            self.ax.plot(self.prev_x, self.prev_y, linestyle=None, marker='.', markersize=1, c='dimgrey')
         self.ax.legend()
         self.fig.canvas.draw()
+        #TODO fix savefig error on Husky
         if self.save:
-            save_file = pathlib.Path(save_dir) / f'{save_name}_{len(self.prev_x)}'
+            save_file = pathlib.Path(save_dir) / f'{save_name}_{len(self.prev_x)}.png'
             save_file.parent.mkdir(exist_ok=True, parents=True)
+            print(f'{save_file}')
             plt.savefig(save_file)
 
     def save_video(self):
