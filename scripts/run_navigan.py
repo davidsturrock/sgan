@@ -16,7 +16,7 @@ from pathlib import Path
 from scripts.goal import seek_goal, seek_live_goal, create_obs_traj, pts_to_tfs
 from scripts.model_loaders import get_combined_generator
 from sgan.data.loader import data_loader
-from sgan.utils import get_dset_path, save_plot_trajectory
+from sgan.utils import get_dset_path, save_plot_trajectory, write_plots_to_video
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
@@ -83,11 +83,12 @@ def main(args):
     # print(nav.obs_traj[::, 0].T)
     # print()
     # sys.exit(0)
-
+    first = True
     while not rospy.is_shutdown():
         start = time.perf_counter()
         # x, y = (t.item() for t in obs_traj[-1, 0])
-        pred, pred_rel = nav.seek_live_goal(x=40, y=20, title=f'Loop iteration {count}')
+        pred, pred_rel = nav.seek_live_goal(x=40, y=20, title=f'Jan_{count}', first=first)
+        first = False
         goal_tfs = pts_to_tfs(pred_rel)
         nav.goal_step(goal_tfs[0])
         # print(goal_tfs[0])
@@ -103,3 +104,4 @@ def main(args):
 if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
+    # write_plots_to_video()

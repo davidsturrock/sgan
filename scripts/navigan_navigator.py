@@ -5,7 +5,7 @@ import sys
 import torch
 
 from scripts.model_loaders import get_combined_generator
-from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative, plot_trajectories
+from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative, plot_trajectories, live_plotter
 
 sys.path.insert(0, '/home/administrator/code/aru-core/build/lib')
 # sys.path.insert(0, '/home/david/code/aru-core/build/lib')
@@ -168,7 +168,7 @@ class Navigator:
         self.goal = goal
         self.goal_status = True
 
-    def seek_live_goal(self, x, y, agent_id=0, title='live_exp'):
+    def seek_live_goal(self, x, y, first, agent_id=0, title='live_exp'):
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
             obs_traj_rel = abs_to_relative(self.obs_traj)
@@ -192,8 +192,8 @@ class Navigator:
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-
-            save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+            live_plotter(title, ota, ptga, ptfa, seq_start_end, first=first)
+            # save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:
         #         print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')

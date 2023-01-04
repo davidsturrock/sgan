@@ -12,13 +12,14 @@ import inspect
 from contextlib import contextmanager
 import subprocess
 import matplotlib
+# Only use tkagg backend on laptop NOT HPC
+if not torch.cuda.is_available():
+    matplotlib.use('tkagg')
 from matplotlib import pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.colors as mcolours
 
-# Only use tkagg backend on laptop NOT HPC
-if not torch.cuda.is_available():
-    matplotlib.use('tkagg')
+
 
 
 def get_cmap(n, name='hsv'):
@@ -105,6 +106,69 @@ def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_a
 
         plt.savefig(save_file)
         plt.close(fig)
+
+class plotter:
+    def __init__(self):
+        plt.ion()
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot()
+        self.prev_x = []
+        self.prev_y = []
+        plt.title(f'Goal Pt {title}')
+        plt.axis('square')
+        ax.set_xlabel('X [m]')
+        ax.set_ylabel('Y [m]')
+        plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+
+    def display(self, obs_traj, pred):
+        self.ax.clear()
+        self.ax.plot(self.prev_x, self.prev_y, marker='x', c='dimgrey')
+        self.ax.scatter(obs_traj[0], [1], c="red", marker="o", zorder=10)
+        self.fig.canvas.draw()
+        return 0
+def live_plotter(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end, first, save=True):
+    for i, (s, e) in enumerate(seq_start_end[::, ::]):
+        # print(f'i {i}, s {s},e {e}')
+        cmap = list(mcolours.TABLEAU_COLORS.keys())
+        if len(cmap) < e - s:
+            cmap = list(mcolours.CSS4_COLORS.keys())
+        fig, ax = plt.subplots()
+
+        for j in range(s, e):
+            colour = cmap.pop(0)
+            l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
+                         linestyle='', marker='.')
+            # l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
+            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], markersize=3, c=colour,
+                         linestyle='',
+                         marker='*')
+
+        # plt.title(f'Goal Pt {title.split("/")[1]}')
+        plt.title(f'Goal Pt {title}')
+        plt.axis('square')
+        ax.set_xlabel('X [m]')
+        ax.set_ylabel('Y [m]')
+        plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
+                                 markersize=5, label='Obs_traj')
+        # x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
+        #                        markersize=5, label='Pred_traj_gt')
+        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
+                                  markersize=5, label='Pred_traj_fake')
+        # ax.legend(handles=[dot_line, x_line, star_line])
+        # ax.legend(handles=[dot_line, star_line])
+        xlim = [-5, 15]
+        ax.set_xlim(xlim)
+        ylim = [-10, 10]
+        ax.set_ylim(ylim)
+        save_file = pathlib.Path('/home/administrator/code/sgan/plots') / f'{title}_seq_{i}.png'
+        save_file.parent.mkdir(exist_ok=True, parents=True)
+        if save:
+            plt.savefig(save_file)
+        if first:
+            plt.show()
+        # plt.waitforbuttonpress()
+        # plt.close()
 
 
 def int_tuple(s):
