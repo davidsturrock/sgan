@@ -10,6 +10,7 @@ import torch
 from sgan.utils import relative_to_abs, save_plot_trajectory, plot_trajectories, abs_to_relative
 from sgan.data.trajectories import read_file
 from scipy.spatial.transform import Rotation as R
+
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -117,6 +118,30 @@ def seek_goal(dpath, loader, generator, agent_id=0, iters=50, x=7, y=14):
         # if batch_no == 1:
 
 
+def count_suitable_target_agents_in_dataset(dpath, loader, generator):
+    print(f'Loader len: {len(loader)}')
+    trajs = 0
+    good_agents = 0
+    with torch.no_grad():
+        for i, batch in enumerate(loader):
+
+
+            (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
+             non_linear_ped, loss_mask, seq_start_end) = batch
+            trajs += obs_traj.shape[1]
+
+            with np.printoptions(precision=3, suppress=True):
+                for last_obs in obs_traj[-1]:
+
+                    for filename in Path(dpath).rglob('*'):
+                        data = read_file(filename)
+
+                        if goal_point_exists(data, generator, last_obs):
+                            good_agents += 1
+        print(f'No. of trajs: {trajs}')
+        print(f'No. of suitable agents: {good_agents}')
+
+
 def create_obs_traj(transforms):
     xvals, yvals = generate_transform_path(transforms)
     xy_vals = list(zip(xvals, yvals))
@@ -126,7 +151,7 @@ def create_obs_traj(transforms):
     return torch.tensor(data=xy_vals, device=_DEVICE_, requires_grad=False).unsqueeze(1).float()
 
 
-def seek_live_goal(obs_traj, generator, x, y, agent_id =0, title = 'live_exp'):
+def seek_live_goal(obs_traj, generator, x, y, agent_id=0, title='live_exp'):
     with torch.no_grad():
         pred_traj_gt = torch.zeros(obs_traj.shape, device=_DEVICE_)
         obs_traj_rel = abs_to_relative(obs_traj)
@@ -157,6 +182,7 @@ def seek_live_goal(obs_traj, generator, x, y, agent_id =0, title = 'live_exp'):
     #     if i == agent_id:
     #         print(f'Ped {i} predicted gt\tX\n\t\t\t\t\tY\n{ped.T}')
     return ptfa, pred_traj_fake_rel
+
 
 def pts_to_tfs(pred_traj_fake_rel):
     tfs = []
@@ -190,7 +216,6 @@ def pts_to_tfs(pred_traj_fake_rel):
         # print('-'*20)
 
     return np.array(tfs)
-
 
 
 def get_goal_point(data, generator, last_obs):
@@ -235,7 +260,37 @@ def get_goal_point(data, generator, last_obs):
         return torch.tensor(data[goal_idx, 2:])
     else:
         # print('Could not find 3*pred_len goal')
-        return torch.zeros(1, 2)
+        return torch.zeros((1, 2), device=_DEVICE_)
+
+
+def goal_point_exists(data, generator, last_obs):
+    x, y = (t.item() for t in last_obs)
+    xmask = np.isclose(data[::, 2], x, atol=0.005)
+    ymask = np.isclose(data[::, 3], y, atol=0.005)
+    x_idxs = np.argwhere((xmask))
+    y_idxs = np.argwhere((ymask))
+    match_idx = np.intersect1d(x_idxs, y_idxs)
+    if len(match_idx) > 1:
+        match_idx = get_closest_match(data, last_obs, match_idx)
+    else:
+        match_idx = match_idx[0]
+
+    agent_id = data[match_idx, 1]
+
+    subset = data[match_idx::]
+    frames_w_agent = np.argwhere(subset[::, 1] == agent_id)
+    agent_final_frame = subset[frames_w_agent][-1]
+    goal_idx = int(np.argwhere(np.all(data == agent_final_frame, axis=1)))
+
+    # If the goal index is within dataset size and the agent id of the goal
+    # line matches the matching line
+    if subset[frames_w_agent].shape[0] - 1 > 3 * generator.goal.pred_len:
+        # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
+        # print(f'Matching line: {data[match_idx]}')
+        # print(f'3*pred_len line: {data[goal_idx]}')
+        return True
+    else:
+        return False
 
 
 def get_closest_match(data, last_obs, match_idx):
@@ -388,7 +443,7 @@ if __name__ == '__main__':
 
     obs_traj_rel = abs_to_relative(obs_traj)
     print(f'obs_traj_rel:\n {obs_traj_rel.T}')
-    print('-'*100)
+    print('-' * 100)
     # check = relative_to_abs(obs_traj_rel, start_pos=obs_traj[0])
 
     # pred_traj_gt = torch.zeros(obs_traj.shape)
@@ -402,4 +457,4 @@ if __name__ == '__main__':
         # x,y = generate_transform_path(tfs)
         check = relative_to_abs(obs_traj_rel, start_pos=obs_traj[0])
         print(f'Recreated obs_traj: \n{check.T}')
-        print(f'Recreated == Orig? {torch.equal(obs_traj,check)}')
+        print(f'Recreated == Orig? {torch.equal(obs_traj, check)}')

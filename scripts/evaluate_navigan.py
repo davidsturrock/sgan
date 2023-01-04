@@ -8,7 +8,7 @@ from attrdict import AttrDict
 from pathlib import Path
 
 from scripts.evaluate_model import evaluate_helper
-from scripts.goal import seek_goal
+from scripts.goal import seek_goal, count_suitable_target_agents_in_dataset
 from scripts.model_loaders import get_combined_generator
 from sgan.data.loader import data_loader
 from sgan.data.trajectories import read_file
@@ -31,9 +31,9 @@ def evaluate(args, loader, dset, generator, num_samples):
             # batch = [tensor for tensor in batch]
             (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
              non_linear_ped, loss_mask, seq_start_end) = batch
-            print(obs_traj[::,0].T)
-            print(obs_traj_rel[::,0].T)
-            sys.exit(0)
+            # print(obs_traj[::,0].T)
+            # print(obs_traj_rel[::,0].T)
+            # sys.exit(0)
             ade, fde = [], []
             total_traj += pred_traj_gt.size(1)
             ota = obs_traj.numpy()
@@ -41,7 +41,7 @@ def evaluate(args, loader, dset, generator, num_samples):
             for _ in range(num_samples):
                 pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end,
                                                pred_traj_gt[-1].reshape(1, -1, 2))
-                pred_traj_fake = relative_to_abs(pred_traj_fake_rel)
+                pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
 
                 ade.append(displacement_error(pred_traj_fake, pred_traj_gt, mode='raw'))
                 fde.append(final_displacement_error(pred_traj_fake[-1], pred_traj_gt[-1], mode='raw'))
@@ -89,6 +89,7 @@ def main(args):
         # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
         # seek_goal(dpath, loader, generator, agent_id=1, iters=50)
+        count_suitable_target_agents_in_dataset(dpath, loader, generator)
         print(f'No. of seqs: {len(dset)}')
         # seek_goal_simulated_data(generator, iters=50)
 
