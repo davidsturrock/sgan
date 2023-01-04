@@ -290,8 +290,8 @@ def create_goal_state(dpath, pred_len, obs_traj):
     if subset[frames_w_agent].shape[0] - 1 > 3 * pred_len:
         print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
         goal_state[0, 0] = torch.tensor(data[goal_idx, 2:])
-        print(goal_state)
-        sys.exit(0)
+        # print(goal_state)
+        # sys.exit(0)
     return goal_state
 
 
