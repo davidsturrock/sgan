@@ -276,7 +276,7 @@ def create_goal_state(dpath, pred_len, obs_traj):
     # If the goal index is within dataset size and the agent id of the goal
     # line matches the matching line
     if subset[frames_w_agent].shape[0] - 1 > 3 * pred_len:
-        print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
+        # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
         goal_state[0, 0] = torch.tensor(data[goal_idx, 2:])
         # print(goal_state)
         # sys.exit(0)
@@ -323,8 +323,8 @@ def goal_point_exists(data, generator, last_obs):
 
 
 def get_closest_match(data, last_obs, match_idx):
-    """Returns closest matching line in array according to smallest l1 distance between x and y pairs"""
-
+    """Returns the closest matching line in array according to smallest l1 distance between x and y pairs"""
+    last_obs = last_obs.numpy()
     # print(f'x {x:.4f} y {y:.4f} matching lines: {match_idx}')
     # print(data[match_idx])
     diff_dict = {}
