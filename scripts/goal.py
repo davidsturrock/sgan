@@ -252,23 +252,23 @@ def get_goal_point(data, pred_len, last_obs):
 def create_goal_state(dpath, pred_len, obs_traj):
     goal_state = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
     last_obs = obs_traj[-1, 0]
-    print(f'Last obs: {last_obs}')
+    # print(f'Last obs: {last_obs}')
     # Search through training text files for a matching last observed (x,y)
     for filename in Path(dpath).rglob('*'):
         data = read_file(filename)
         match_idx = get_match_idx(data, last_obs)
         # If no matches in current file continue to next
         if len(match_idx) == 0:
-            print(f'No match in {Path(filename).name}')
+            # print(f'No match in {Path(filename).name}')
             continue
         # This if-else just makes format of match_idx consistent
         if len(match_idx) > 1:
-            print(f'{len(match_idx)} matches in {Path(filename).name}')
+            # print(f'{len(match_idx)} matches in {Path(filename).name}')
             match_idx = get_closest_match(data, last_obs, match_idx)
-            print(f'Closest match is {match_idx}')
+            # print(f'Closest match is {match_idx}')
         else:
             match_idx = match_idx[0]
-            print(f'Single match ({match_idx}) in {Path(filename).name}')
+            # print(f'Single match ({match_idx}) in {Path(filename).name}')
         break
 
     if not match_idx:
@@ -278,11 +278,11 @@ def create_goal_state(dpath, pred_len, obs_traj):
     agent_id = data[match_idx, 1]
     subset = data[match_idx::]
     frames_w_agent = np.argwhere(subset[::, 1] == agent_id)
-    with np.printoptions(precision=2, suppress=True):
-        print(f'\t{frames_w_agent.shape[0]} Frames w/ agent:')
-        for line in subset[frames_w_agent]:
-            print(line[0])
-    print(f'Line no.s of frames w/ agent:\n {np.argwhere(data[::, 1] == agent_id).T[0] + 1}')
+    # with np.printoptions(precision=2, suppress=True):
+    #     print(f'\t{frames_w_agent.shape[0]} Frames w/ agent:')
+    #     for line in subset[frames_w_agent]:
+    #         print(line[0])
+    # print(f'Line no.s of frames w/ agent:\n {np.argwhere(data[::, 1] == agent_id).T[0] + 1}')
 
     # agent_final_frame = subset[frames_w_agent][-1]
     # agent_3pred_frame = subset[frames_w_agent][3*pred_len]
@@ -290,17 +290,17 @@ def create_goal_state(dpath, pred_len, obs_traj):
 
     # If the goal index is within dataset size and the agent id of the goal
     # line matches the matching line
-    if subset[frames_w_agent].shape[0] - 1 > 3 * pred_len:
+    if subset[frames_w_agent].shape[0] > 3 * pred_len:
         agent_goal_frame = subset[frames_w_agent][3*pred_len]
     else:
         agent_goal_frame = subset[frames_w_agent][-1]
     goal_idx = int(np.argwhere(np.all(data == agent_goal_frame, axis=1)))
-    print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames after frame {data[match_idx, 0]}.')
-    print(f'Match index: {match_idx} [Line no. {match_idx+1}]')
-    print(f'Goal index {goal_idx} [Line no. {goal_idx+1}]')
+    # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames after frame {data[match_idx, 0]}.')
+    # print(f'Match index: {match_idx} [Line no. {match_idx+1}]')
+    # print(f'Goal index {goal_idx} [Line no. {goal_idx+1}]')
     goal_state[0, 0] = torch.tensor(data[goal_idx, 2:])
-    print(goal_state[0,0])
-    sys.exit(0)
+    # print(goal_state[0,0])
+    # sys.exit(0)
     return goal_state
 
 
