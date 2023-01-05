@@ -2,8 +2,10 @@ import pathlib
 import time
 import sys
 import torch
+from aru_sil_py.utilities.VisualOdometry import generate_transform_path
 
 from scripts.model_loaders import get_combined_generator
+from scripts.run_navigan import _DEVICE_
 from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative
 
 # sys.path.insert(0, '/home/administrator/code/aru-core/build/lib')
@@ -159,3 +161,38 @@ def shape_check(tf):
     if tf.shape == (4, 4):
         tf = tf.reshape(1, 4, 4)
     return tf
+
+
+def make_scene(count, tf, tf1, tfs):
+    obs_traj = create_obs_traj(tfs)
+    other_ped = obs_traj.clone()
+    other_ped[::, 0, 1] = other_ped[::, 0, 1] + 5
+    obs_traj = torch.cat([obs_traj, other_ped], dim=1)
+    # print(obs_traj.shape)
+    # print(obs_traj[::,0].T)
+    # print(obs_traj[::,1].T)
+    return obs_traj
+
+
+def update_scene(obs_traj, count, tf, tf1, tfs, pred):
+    tfs.append(tf if count % 2 == 0 else tf1)
+    # Update other ped
+    other_ped = create_obs_traj(tfs)
+    other_ped[::, 0, 1] = other_ped[::, 0, 1] + 5
+    # obs_traj[::, 1] = other_ped[::]
+    # Update goal agent
+    obs_traj[:-1, 0] = obs_traj.clone()[1:, 0]
+    obs_traj[-1] = pred[0, 0]
+    new_agent_traj = obs_traj[::, 0].clone()
+    new_agent_traj = new_agent_traj.unsqueeze(1)
+    obs_traj = torch.cat([new_agent_traj, other_ped], dim=1)
+    return obs_traj
+
+
+def create_obs_traj(transforms):
+    xvals, yvals = generate_transform_path(transforms)
+    xy_vals = list(zip(xvals, yvals))
+    if len(xy_vals) > 8:
+        xy_vals = xy_vals[-8:]
+
+    return torch.tensor(data=xy_vals, device=_DEVICE_, requires_grad=False).unsqueeze(1).float()

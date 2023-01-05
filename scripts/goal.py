@@ -1,12 +1,9 @@
 import math
-
 import sys
+
 from pathlib import Path
 import numpy as np
-import aru_sil_py
-from aru_sil_py.utilities.VisualOdometry import generate_transform_path
 import torch
-
 from sgan.utils import relative_to_abs, save_plot_trajectory, plot_trajectories, abs_to_relative
 from sgan.data.trajectories import read_file
 from scipy.spatial.transform import Rotation as R
@@ -139,15 +136,6 @@ def count_suitable_target_agents_in_dataset(dpath, loader, generator):
                             good_agents += 1
         print(f'No. of trajs: {trajs}')
         print(f'No. of suitable agents: {good_agents}')
-
-
-def create_obs_traj(transforms):
-    xvals, yvals = generate_transform_path(transforms)
-    xy_vals = list(zip(xvals, yvals))
-    if len(xy_vals) > 8:
-        xy_vals = xy_vals[-8:]
-
-    return torch.tensor(data=xy_vals, device=_DEVICE_, requires_grad=False).unsqueeze(1).float()
 
 
 def seek_live_goal(obs_traj, generator, x, y, agent_id=0, title='live_exp'):
@@ -466,36 +454,3 @@ def load_next_seq(i, dset):
     # print('-' * 100)
     # sys.exit(0)
     return pred_traj_gt[-1]
-
-
-if __name__ == '__main__':
-    tf = np.eye(4)
-    tf3 = np.eye(4)
-    tf[2, 3] = 0.5
-    tf[0, 3] = 0.5
-    tf1 = [tf for _ in range(4)]
-    tf3[2, 3] = 0.5
-    tf3[0, 3] = 0.0
-    tf2 = [tf3 for _ in range(4)]
-
-    tfs = tf1 + tf2
-    obs_traj = create_obs_traj(tfs)
-    print(f'obs_traj:\n {obs_traj.T}')
-
-    obs_traj_rel = abs_to_relative(obs_traj)
-    print(f'obs_traj_rel:\n {obs_traj_rel.T}')
-    print('-' * 100)
-    # check = relative_to_abs(obs_traj_rel, start_pos=obs_traj[0])
-
-    # pred_traj_gt = torch.zeros(obs_traj.shape)
-    # print(pred_traj_gt)
-    with np.printoptions(precision=3, suppress=True):
-        tfs = pts_to_tfs(obs_traj_rel)
-        # print(tfs)
-        check = create_obs_traj(tfs)
-        print(f'Check obs_traj_rel:\n {check.T}')
-        # print(tfs)
-        # x,y = generate_transform_path(tfs)
-        check = relative_to_abs(obs_traj_rel, start_pos=obs_traj[0])
-        print(f'Recreated obs_traj: \n{check.T}')
-        print(f'Recreated == Orig? {torch.equal(obs_traj, check)}')

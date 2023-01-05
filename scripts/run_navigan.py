@@ -1,22 +1,15 @@
-import time
-
 import numpy as np
 import rospy
 import sys
 
 import argparse
-import os
 import torch
 from aru_sil_py.navigation.nav_options import NavOptions
-from navigan_navigator import Navigator
-from aru_sil_py.utilities.Transform import distance_and_yaw_from_transform
-from attrdict import AttrDict
-from pathlib import Path
 
-from scripts.goal import seek_goal, seek_live_goal, create_obs_traj, pts_to_tfs
-from scripts.model_loaders import get_combined_generator
-from sgan.data.loader import data_loader
-from sgan.utils import get_dset_path
+from navigan_navigator import Navigator
+
+from scripts.goal import pts_to_tfs
+from scripts.navigan_navigator import make_scene, update_scene
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
@@ -59,32 +52,8 @@ def main(args):
             sys.exit(0)
 
 
-def make_scene(count, tf, tf1, tfs):
-    obs_traj = create_obs_traj(tfs)
-    other_ped = obs_traj.clone()
-    other_ped[::, 0, 1] = other_ped[::, 0, 1] + 5
-    obs_traj = torch.cat([obs_traj, other_ped], dim=1)
-    # print(obs_traj.shape)
-    # print(obs_traj[::,0].T)
-    # print(obs_traj[::,1].T)
-    return obs_traj
-
-
-def update_scene(obs_traj, count, tf, tf1, tfs, pred):
-    tfs.append(tf if count % 2 == 0 else tf1)
-    # Update other ped
-    other_ped = create_obs_traj(tfs)
-    other_ped[::, 0, 1] = other_ped[::, 0, 1] + 5
-    # obs_traj[::, 1] = other_ped[::]
-    # Update goal agent
-    obs_traj[:-1, 0] = obs_traj.clone()[1:, 0]
-    obs_traj[-1] = pred[0, 0]
-    new_agent_traj = obs_traj[::, 0].clone()
-    new_agent_traj = new_agent_traj.unsqueeze(1)
-    obs_traj = torch.cat([new_agent_traj, other_ped], dim=1)
-    return obs_traj
-
-
 if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
+
+
