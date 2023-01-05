@@ -100,7 +100,7 @@ def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_a
         ax.set_xlim(xlim)
         ylim = [-10,10]
         ax.set_ylim(ylim)
-        save_file = pathlib.Path('/home/david/Pictures/plots/sgan/navigan') / f'{title}_seq_{i}.png'
+        save_file = pathlib.Path('/home/david/Pictures/plots/sgan/navigan3pred') / f'{title}_seq_{i}.png'
         save_file.parent.mkdir(exist_ok=True, parents=True)
 
         plt.savefig(save_file)

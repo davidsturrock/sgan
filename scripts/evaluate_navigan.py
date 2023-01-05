@@ -8,7 +8,7 @@ from attrdict import AttrDict
 from pathlib import Path
 
 from scripts.evaluate_model import evaluate_helper
-from scripts.goal import seek_goal, count_suitable_target_agents_in_dataset
+from scripts.goal import seek_goal, count_suitable_target_agents_in_dataset, seek_goal_simulated_data
 from scripts.model_loaders import get_combined_generator
 from sgan.data.loader import data_loader
 from sgan.data.trajectories import read_file
@@ -85,13 +85,14 @@ def main(args):
 
         # plot_losses(checkpoint, train=True)
         # sys.exit(0)
-        ade, fde = evaluate(_args, loader, dset, generator, args.num_samples)
+        # ade, fde = evaluate(_args, loader, dset, generator, args.num_samples)
         # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
-        # seek_goal(dpath, loader, generator, agent_id=1, iters=50)
-        count_suitable_target_agents_in_dataset(dpath, loader, generator)
-        print(f'No. of seqs: {len(dset)}')
-        # seek_goal_simulated_data(generator, iters=50)
+
+        # count_suitable_target_agents_in_dataset(dpath, loader, generator)
+        # print(f'No. of seqs: {len(dset)}')
+        # seek_goal(dpath, loader, generator, agent_id=0, iters=50)
+        seek_goal_simulated_data(generator, x=10, y=10, arrival_tol=2.2)
 
 
 if __name__ == '__main__':

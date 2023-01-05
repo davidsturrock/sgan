@@ -47,7 +47,7 @@ def goal_experiment(batch_no, first, generator, goal_state, i, obs_traj, obs_tra
 
 def seek_goal(dpath, loader, generator, agent_id=0, iters=50, x=7, y=14):
     batch_no = 0
-    print(f'Loader len: {len(loader)}')
+    # print(f'Loader len: {len(loader)}')
     trajs = 0
     with torch.no_grad():
         for i, batch in enumerate(loader):
@@ -70,7 +70,7 @@ def seek_goal(dpath, loader, generator, agent_id=0, iters=50, x=7, y=14):
 
                         goal_state[0, i] = get_goal_point(data, generator.goal.pred_len, last_obs)
 
-            continue
+            # continue
             # if obs_traj.shape[1] > 3:
             #     continue
             # if i < 18:
@@ -98,7 +98,7 @@ def seek_goal(dpath, loader, generator, agent_id=0, iters=50, x=7, y=14):
 
                 ota = update_observations(agent_id, j, obs_traj, obs_traj_rel, pred_traj_fake_rel, pred_traj_gt,
                                           pred_traj_gt_rel, ptfa)
-        print(f'No. of trajs: {trajs}')
+        # print(f'No. of trajs: {trajs}')
         # if j > iters//2:
         #     goal_state[0, 0, 0] = 8
         #     goal_state[0, 0, 1] = 8
@@ -116,7 +116,6 @@ def seek_goal(dpath, loader, generator, agent_id=0, iters=50, x=7, y=14):
 
 
 def count_suitable_target_agents_in_dataset(dpath, loader, generator):
-    print(f'Loader len: {len(loader)}')
     trajs = 0
     good_agents = 0
     with torch.no_grad():
@@ -241,7 +240,7 @@ def get_goal_point(data, pred_len, last_obs):
     # line matches the matching line
 
     if subset[frames_w_agent].shape[0] - 1 > 3 * pred_len:
-        print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
+        # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
         # print(f'Matching line: {data[match_idx]}')
         # print(f'3*pred_len line: {data[goal_idx]}')
         return torch.tensor(data[goal_idx, 2:])
@@ -251,35 +250,57 @@ def get_goal_point(data, pred_len, last_obs):
 
 
 def create_goal_state(dpath, pred_len, obs_traj):
-    for filename in Path(dpath).rglob('*'):
-        data = read_file(filename)
-
     goal_state = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
     last_obs = obs_traj[-1, 0]
-    match_idx = get_match_idx(data, last_obs)
-    if len(match_idx) == 0:
-        return goal_state
+    print(f'Last obs: {last_obs}')
+    # Search through training text files for a matching last observed (x,y)
+    for filename in Path(dpath).rglob('*'):
+        data = read_file(filename)
+        match_idx = get_match_idx(data, last_obs)
+        # If no matches in current file continue to next
+        if len(match_idx) == 0:
+            print(f'No match in {Path(filename).name}')
+            continue
+        # This if-else just makes format of match_idx consistent
+        if len(match_idx) > 1:
+            print(f'{len(match_idx)} matches in {Path(filename).name}')
+            match_idx = get_closest_match(data, last_obs, match_idx)
+            print(f'Closest match is {match_idx}')
+        else:
+            match_idx = match_idx[0]
+            print(f'Single match ({match_idx}) in {Path(filename).name}')
+        break
 
-    if len(match_idx) > 1:
-        match_idx = get_closest_match(data, last_obs, match_idx)
-    else:
-        match_idx = match_idx[0]
-
+    if not match_idx:
+        print(f'No matches found in any file in {Path(filename).parent}')
+        print(f'Last obs: {last_obs}')
+        sys.exit(0)
     agent_id = data[match_idx, 1]
-
     subset = data[match_idx::]
     frames_w_agent = np.argwhere(subset[::, 1] == agent_id)
+    with np.printoptions(precision=2, suppress=True):
+        print(f'\t{frames_w_agent.shape[0]} Frames w/ agent:')
+        for line in subset[frames_w_agent]:
+            print(line[0])
+    print(f'Line no.s of frames w/ agent:\n {np.argwhere(data[::, 1] == agent_id).T[0] + 1}')
 
-    agent_final_frame = subset[frames_w_agent][-1]
-    goal_idx = int(np.argwhere(np.all(data == agent_final_frame, axis=1)))
+    # agent_final_frame = subset[frames_w_agent][-1]
+    # agent_3pred_frame = subset[frames_w_agent][3*pred_len]
+    # goal_idx = int(np.argwhere(np.all(data == agent_final_frame, axis=1)))
 
     # If the goal index is within dataset size and the agent id of the goal
     # line matches the matching line
     if subset[frames_w_agent].shape[0] - 1 > 3 * pred_len:
-        # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
-        goal_state[0, 0] = torch.tensor(data[goal_idx, 2:])
-        # print(goal_state)
-        # sys.exit(0)
+        agent_goal_frame = subset[frames_w_agent][3*pred_len]
+    else:
+        agent_goal_frame = subset[frames_w_agent][-1]
+    goal_idx = int(np.argwhere(np.all(data == agent_goal_frame, axis=1)))
+    print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames after frame {data[match_idx, 0]}.')
+    print(f'Match index: {match_idx} [Line no. {match_idx+1}]')
+    print(f'Goal index {goal_idx} [Line no. {goal_idx+1}]')
+    goal_state[0, 0] = torch.tensor(data[goal_idx, 2:])
+    print(goal_state[0,0])
+    sys.exit(0)
     return goal_state
 
 
@@ -289,6 +310,7 @@ def get_match_idx(data, last_obs):
     ymask = np.isclose(data[::, 3], y, atol=0.005)
     x_idxs = np.argwhere(xmask)
     y_idxs = np.argwhere(ymask)
+
     return np.intersect1d(x_idxs, y_idxs)
 
 
@@ -355,7 +377,11 @@ def update_observations(agent_id, j, obs_traj, obs_traj_rel, pred_traj_fake_rel,
     return obs_traj.numpy()
 
 
-def seek_goal_simulated_data(generator, iters=8, x=6, y=-18):
+def seek_goal_simulated_data(generator, x, y, iters=60, x_start=0, y_start=0, arrival_tol=0.5):
+    """
+    iters = 5 * pred_len
+    arrival_tol: distance in metres within which goal is considered reached by agent
+    """
     with torch.no_grad():
         xs = torch.ones(8, device=_DEVICE_) * 0.25
         ys = torch.zeros(8, device=_DEVICE_)
@@ -364,12 +390,12 @@ def seek_goal_simulated_data(generator, iters=8, x=6, y=-18):
         pred_ys = ys
         obs_traj_rel = torch.tensor(list(zip(ys, xs)), device=_DEVICE_).reshape(8, 1, 2)
         start_positions_obs = torch.zeros((obs_traj_rel.shape[1], 2), device=_DEVICE_)
-        # start_positions_obs[0, 0] = 0
-        # start_positions_obs[0, 1] = 0
-        obs_traj = relative_to_abs(obs_traj_rel)
+        start_positions_obs[0, 0] = x_start
+        start_positions_obs[0, 1] = y_start
+        obs_traj = relative_to_abs(obs_traj_rel, start_positions_obs)
         pred_traj_gt_rel = torch.tensor(list(zip(pred_ys, pred_xs)), device=_DEVICE_).reshape(8, 1, 2)
         start_positions_preds = obs_traj[-1].clone().detach()
-        pred_traj_gt = relative_to_abs(pred_traj_gt_rel)
+        pred_traj_gt = relative_to_abs(pred_traj_gt_rel, start_positions_preds)
         seq_start_end = torch.tensor([0, 1], device=_DEVICE_).unsqueeze(0)
 
         ota = obs_traj.numpy()
@@ -382,14 +408,18 @@ def seek_goal_simulated_data(generator, iters=8, x=6, y=-18):
 
         suffix = f'| x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
         for j in range(iters):
+            distance = (goal_state[0, 0] - obs_traj[-1, 0]).pow(2).sum(0).sqrt()
+            print(f'Distance to goal: {distance.item():.2f}m')
             # print(goal_state.shape)
             # pred_traj_gt[-1].reshape(1, -1, 2)
             pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
-            ptfa = relative_to_abs(pred_traj_fake_rel)
+            ptfa = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
             title = f'{dir}/Iter {j} {suffix}'
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
             save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
-
+            if distance < arrival_tol:
+                print(f'Agent has arrived at goal. ({distance.item():.2f}m away)')
+                break
             # Shift the obs traj along by one timestep using the pred_traj_fake_abs (ptfa)
             # as the next observed point
             obs_traj[:-1] = obs_traj[1::].clone()
@@ -397,16 +427,10 @@ def seek_goal_simulated_data(generator, iters=8, x=6, y=-18):
             ota = obs_traj.numpy()
             obs_traj_rel[:-1] = obs_traj_rel[1::].clone()
             obs_traj_rel[-1] = pred_traj_fake_rel[0]
-            if j > iters // 2:
-                goal_state[0, 0, 0] = -5
-                goal_state[0, 0, 1] = 20
-            # ptga = pred_traj_gt.numpy()
-        # for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
-        #     if i == 0:
-        #         print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')
-        # for i, ped in enumerate(pred_traj_gt.permute(1, 0, 2)):
-        #     if i == 0:
-        #         print(f'Ped {i} predicted gt\tX\n\t\t\t\t\tY\n{ped.T}')
+            # if j == iters // 2 - 1:
+            #     goal_state[0, 0, 0] = -5
+            #     goal_state[0, 0, 1] = 20
+            #     suffix = f'| x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
 
 
 def create_goal_states(obs_traj, pred_traj_gt, seq_start_end):
