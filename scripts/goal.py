@@ -328,8 +328,8 @@ def get_closest_match(data, last_obs, match_idx):
     # print(f'x {x:.4f} y {y:.4f} matching lines: {match_idx}')
     # print(data[match_idx])
     diff_dict = {}
-    diff_dict[np.linalg.norm(data[match_idx[0]][2:] - last_obs.numpy())] = match_idx[0]
-    diff_dict[np.linalg.norm(data[match_idx[1]][2:] - last_obs.numpy())] = match_idx[1]
+    diff_dict[np.linalg.norm(data[match_idx[0]][2:] - last_obs)] = match_idx[0]
+    diff_dict[np.linalg.norm(data[match_idx[1]][2:] - last_obs)] = match_idx[1]
     min_key = min(diff_dict.keys())
     return diff_dict[min_key]
 
