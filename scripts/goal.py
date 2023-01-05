@@ -324,7 +324,7 @@ def goal_point_exists(data, generator, last_obs):
 
 def get_closest_match(data, last_obs, match_idx):
     """Returns the closest matching line in array according to smallest l1 distance between x and y pairs"""
-    last_obs = last_obs.numpy()
+    last_obs = last_obs.cpu().numpy()
     # print(f'x {x:.4f} y {y:.4f} matching lines: {match_idx}')
     # print(data[match_idx])
     diff_dict = {}
