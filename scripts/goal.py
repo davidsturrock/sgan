@@ -292,8 +292,10 @@ def create_goal_state(dpath, pred_len, obs_traj):
     # line matches the matching line
     if subset[frames_w_agent].shape[0] > 3 * pred_len:
         agent_goal_frame = subset[frames_w_agent][3*pred_len]
+        # print('3*pred_len goal chosen')
     else:
         agent_goal_frame = subset[frames_w_agent][-1]
+        # print(f'Goal {subset[frames_w_agent].shape[0] - 1} frames ahead chosen')
     goal_idx = int(np.argwhere(np.all(data == agent_goal_frame, axis=1)))
     # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames after frame {data[match_idx, 0]}.')
     # print(f'Match index: {match_idx} [Line no. {match_idx+1}]')
