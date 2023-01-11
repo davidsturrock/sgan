@@ -27,7 +27,7 @@ def main(args):
     # ----------------------------------------------
     # Navigator setup
     nav_args = NavOptions().parse()
-    nav = Navigator(nav_args, args.model_path, agents=1, rate=1)
+    nav = Navigator(nav_args, args.model_path, agents=10, rate=1)
 
     # -----------------------------------------------
     count = 0
@@ -41,12 +41,13 @@ def main(args):
     # obs_traj = make_scene(count, tf, tf1, tfs)
     # nav.obs_traj = obs_traj
     # nav.obs_traj = torch.zeros((8, 1, 2))
+
     while not nav.callback_status:
         pass
     print('Wheel Odom received')
-    while False in np.all([nav.obs_traj[::, 0].numpy()], axis=0):
-        pass
-    print('8 points observed.')
+    # while False in np.all([nav.obs_traj[::, 0, 0].numpy()], axis=0):
+    #     pass
+    # print('8 points observed.')
     while not nav.goal_status:
         pass
     print('Goal received')
@@ -57,8 +58,8 @@ def main(args):
         start = time.perf_counter()
         # x, y = (t.item() for t in obs_traj[-1, 0])
         pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}')
-        goal_tfs = pts_to_tfs(pred_rel)
-        nav.goal_step(goal_tfs[0])
+        # goal_tfs = pts_to_tfs(pred_rel)
+        # nav.goal_step(goal_tfs[0])
         count += 1
         nav.sleep()
         print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")

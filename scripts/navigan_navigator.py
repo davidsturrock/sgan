@@ -14,7 +14,7 @@ import numpy as np
 import rospy
 import std_msgs
 from geometry_msgs.msg import Twist, Point
-import aru_py_logger
+# import aru_py_logger
 from utilities.Transform import distance_and_yaw_from_transform
 # from aru_sil_py.utilities.Transform import distance_and_yaw_from_transform
 from nav_msgs.msg import Odometry
@@ -41,13 +41,13 @@ class ControlParameters:
         self.max_z: float = args.max_z
 
 
-def create_tf_logger(logfolder=pathlib.Path('logs'), logname=None,
-                     overwrite: bool = True) -> aru_py_logger.TransformLogger:
-    if logname is None:
-        logname = f'live_tfs_log_{time.strftime("%d-%m-%y-%H:%M:%S")}.monolithic'
-    pathlib.Path(logfolder).mkdir(parents=True, exist_ok=True)
-    logfile = logfolder / logname
-    return aru_py_logger.TransformLogger(str(logfile), overwrite)
+# def create_tf_logger(logfolder=pathlib.Path('logs'), logname=None,
+#                      overwrite: bool = True) -> aru_py_logger.TransformLogger:
+#     if logname is None:
+#         logname = f'live_tfs_log_{time.strftime("%d-%m-%y-%H:%M:%S")}.monolithic'
+#     pathlib.Path(logfolder).mkdir(parents=True, exist_ok=True)
+#     logfile = logfolder / logname
+#     return aru_py_logger.TransformLogger(str(logfile), overwrite)
 
 
 class Navigator:
@@ -72,7 +72,7 @@ class Navigator:
         self.published_points = []
         self.tfs = []
         self.tf_to_last_loc = np.eye(4)
-        self.logger = create_tf_logger() if args.log else None
+        # self.logger = create_tf_logger() if args.log else None
         self.verbose: bool = args.verbose
         self.control_params: ControlParameters = ControlParameters(args)
         rospy.init_node('naviganNavigator', anonymous=True)
@@ -80,7 +80,7 @@ class Navigator:
         self.last_callback = time.perf_counter()
         self.rate_value = rate
         self.rate = rospy.Rate(self.rate_value)
-        self.odom_sub = rospy.Subscriber('/odometry/filtered', Odometry, self.callback)
+        self.odom_sub = rospy.Subscriber('/tracked/pedestrians', Point, self.callback)
         self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
         self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
 
@@ -91,8 +91,8 @@ class Navigator:
         with np.printoptions(precision=2, suppress=True):
             # print(f'Initial TF:\n{tf}')
             x = tf[2, 3]
-            curr_x = self.odom.pose.position.x
-            curr_y = self.odom.pose.position.y
+            # curr_x = self.odom.pose.position.x
+            # curr_y = self.odom.pose.position.y
             rot_mat = R.from_matrix(tf[0:3, 0:3])
             # turn_angle = math.atan2(curr_y, curr_x) * 180 / math.pi
             tf_turn_angle = rot_mat.as_euler('zyx', degrees=True)[0]
@@ -145,10 +145,10 @@ class Navigator:
 
         return cmd_vel
 
-    def callback(self, tracked_pts: Odometry):
+    def callback(self, tracked_pts: Point):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
-        self.odom = tracked_pts.pose
+        # self.odom = tracked_pts.pose
         if 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
             return
         # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
@@ -156,8 +156,9 @@ class Navigator:
         self.obs_traj[:-1] = self.obs_traj.clone()[1:]
         # From agent 0 (Husky) to agent 9 update
         # x and y coordinate from object tracker
-        self.obs_traj[-1, 0, 0] = tracked_pts.pose.pose.position.x
-        self.obs_traj[-1, 0, 1] = tracked_pts.pose.pose.position.y
+        # point.z value contains agent id no.
+        self.obs_traj[-1, int(tracked_pts.z), 0] = tracked_pts.x
+        self.obs_traj[-1, int(tracked_pts.z), 1] = tracked_pts.y
         # for i, pt in enumerate(tracked_pts):
         #     self.obs_traj[-1, i, 0] = pt[0]
         #     self.obs_traj[-1, i, 1] = pt[1]
