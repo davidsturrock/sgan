@@ -17,7 +17,7 @@ import aru_py_pedestrian
 
 class Tracker:
     def __init__(self, pub_topic='/tracked/pedestrians', odom_topic='/odometry/filtered',
-                 lidar_topic='/velodyne_points', rate=1, agents=9):
+                 lidar_topic='/velodyne_points', rate=10, agents=9):
         self.agents = agents
         self.odom = None
         self.lidar_topic = lidar_topic
@@ -42,14 +42,14 @@ class Tracker:
     def odom_callback(self, odom: Odometry):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
-        if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
-            return
+        # if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
+        #     return
         self.odom = odom.pose
         quat = self.odom.pose.orientation
         pose = R.from_quat([quat.x, quat.y, quat.z, quat.w])
         tf = np.eye(4)
         tf[0:3, 0:3] = pose.as_matrix()
-        tf[:3, 3] = np.array([0, self.odom.pose.position.x, self.odom.pose.position.y]).T
+        tf[:3, 3] = np.array([self.odom.pose.position.x, self.odom.pose.position.y, 0]).T
         self.tf = tf
         # print(tf)
         # print('*'*60)
@@ -61,8 +61,8 @@ class Tracker:
     def lidar_callback(self, point_cloud: PointCloud2):
         """Callback for tracker"""
         # Limit callback rate
-        if not self.odom_callback_status or 1 / (time.perf_counter() - self.lidar_last_callback) > self.rate_value:
-            return
+        # if not self.odom_callback_status or 1 / (time.perf_counter() - self.lidar_last_callback) > self.rate_value:
+        #     return
 
         cloud_points = np.array(
             list(point_cloud2.read_points(point_cloud, skip_nans=True, field_names=("x", "y", "z")))).astype(np.float64)

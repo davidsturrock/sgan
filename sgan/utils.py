@@ -120,6 +120,10 @@ class Plotter:
         self.ax.set_xlabel('X [m]')
         self.ax.set_ylabel('Y [m]')
 
+        plt.axis('square')
+        plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+        self.ax.set_xlim(self.xlim)
+        self.ax.set_ylim(self.ylim)
         # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
     def display(self, title, ota, ptfa, sse, save_name='live_plot', save_dir=' /home/administrator/code/sgan/plots'):
@@ -131,11 +135,14 @@ class Plotter:
         self.prev_x.append(ota[-2, 0, 0])
         self.prev_y.append(ota[-2, 0, 1])
         self.ax.clear()
-        plt.title(f'{title}')
+        self.ax.set_xlabel('X [m]')
+        self.ax.set_ylabel('Y [m]')
+
         plt.axis('square')
         plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
         self.ax.set_xlim(self.xlim)
         self.ax.set_ylim(self.ylim)
+        plt.title(f'{title}')
 
         for s, e in sse[::, ::]:
             for j in range(s, e):
@@ -145,15 +152,19 @@ class Plotter:
                     print(e - s)
                 # Plot agent
                 if j == 0:
-                    self.ax.scatter(ota[-1, j, 0], ota[-1, j, 1], c="r", marker=".", zorder=10, label='live location')
-                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*', markersize=2,label='planned path')
+                    self.ax.scatter(ota[-1, j, 0], ota[-1, j, 1], c="r", marker=".", zorder=10)
+                                    # , label='live location')
+                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*', markersize=2)
+                                 # ,label='planned path')
                 # Plot pedestrians
                 else:
+                    # Only plot an agent if 8 non-zero points are observed
+                    # if True in np.all([ota[::, j, 0]], axis=0):
+                    self.ax.plot(ota[::, j, 1], -ota[::, j, 0], c=cmap[j - 1], linestyle='', marker='.',
+                                 markersize=2)
+                                     # )
 
-                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c=cmap[j - 1], linestyle='', marker='.',
-                                 markersize=2, label=f'agent {j}')
-
-            self.ax.plot(self.prev_x, self.prev_y, linestyle=None, marker='.', markersize=1, c='dimgrey')
+            self.ax.plot(self.prev_x[-8::], self.prev_y[-8::], linestyle=None, marker='.', markersize=1, c='dimgrey')
         self.ax.legend()
         self.fig.canvas.draw()
         #TODO fix savefig error on Husky

@@ -89,7 +89,8 @@ class Navigator:
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
         self.ped_sub = rospy.Subscriber('/tracked/pedestrians', Point, self.callback)
         self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
-        self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
+        # self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
+        self.publisher: rospy.Publisher = rospy.Publisher('/relay', Twist, queue_size=1, latch=True)
 
     def sleep(self):
         self.rate.sleep()
@@ -120,6 +121,8 @@ class Navigator:
             if x < self.control_params.dthresh and abs(turn_angle) < self.control_params.ythresh:
                 msg = self.controller(tf)
                 self.publisher.publish(msg)
+            else:
+                print(f'{x} > {self.control_params.dthresh} or {abs(turn_angle)} > {self.control_params.ythresh}')
 
     def controller(self, tf):
         """Controller now assumes TF is within bounds. Check must be performed at higher level"""
@@ -136,9 +139,9 @@ class Navigator:
         # print(f'Controller yaw: {yaw:.2f}')
         # print(f'Yaw: {yaw} deg.')
         # if logging, log the tf for path tracking purposes
-        if self.logger is not None:
+        # if self.logger is not None:
             # TODO add source and dest timestamps to logging
-            self.logger.write_to_file(tf.astype(dtype=np.float64), 0, 1)
+            # self.logger.write_to_file(tf.astype(dtype=np.float64), 0, 1)
 
         cmd_vel.angular.z = -self.control_params.pz * (0 - yaw)
         # Bound the output of controller to within max values
@@ -156,8 +159,9 @@ class Navigator:
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker
         NOTE: 1 is added to agent index because obs_traj row zero is for husky and is updated via wheel odom"""
         # check tracked agent is within limit and limit update rate to self.rate_value
-        if int(tracked_pts.z) > self.agents or 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
-            return
+        # if int(tracked_pts.z) > self.agents or 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
+        #     return
+        print(f'Agent ID: {tracked_pts.z} x: {tracked_pts.x:.2f}m y: {tracked_pts.y:.2f}m')
         # # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
         # Slide selected agent's points fwd a timestep
         self.obs_traj[:-1, 1 + int(tracked_pts.z)] = self.obs_traj.clone()[1:, 1 + int(tracked_pts.z)]
@@ -175,8 +179,8 @@ class Navigator:
     def odom_callback(self, odom: Odometry):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
-        if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
-            return
+        # if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
+        #     return
         self.odom = odom.pose
         # self.husky_odom.append([self.odom.pose.position.x, self.odom.pose.position.y])
         # Slide husky points along by one
@@ -193,6 +197,8 @@ class Navigator:
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
         self.goal = goal
+        self.goal.x -= self.obs_traj[-1,0,0].item()
+        self.goal.y -= self.obs_traj[-1,0,1].item()
         self.goal_status = True
 
     def seek_live_goal(self, agent_id=0, title='live_exp'):
@@ -205,23 +211,26 @@ class Navigator:
                 goal_state = torch.zeros((1, self.obs_traj.shape[1], 2), device=_DEVICE_)
                 # goal_state[0, agent_id] = pred_traj_gt[-1, agent_id]
                 # goal_state[0, agent_id, 0] = x
-                print(self.goal)
+
                 goal_state[0, agent_id, 0] = self.goal.x
                 # goal_state[0, agent_id, 1] = y
                 goal_state[0, agent_id, 1] = self.goal.y
+                print(f'X {self.goal.x:.2f}, Y {self.goal.y:.2f}')
                 # print(goal_state.shape)
 
             ota = self.obs_traj.numpy()
             ptga = pred_traj_gt.numpy()
             # self.obs_traj[::, 0] = self.husky_odom[-8::]
             # self.obs_traj[::, 1::] = self.tracked_agents[-8::]
-            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, 1)
+            # print(self.obs_traj[::,0].T)
+            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
             start_pos = self.obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
+            # print(ptfa[::,0].T)
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-            self.plotter.display(title=f'x: {self.goal.x}m y: {self.goal.y}m', ota=ota, ptfa=ptfa, sse=seq_start_end)
+            self.plotter.display(title=f'x: {self.goal.x:.2f}m y: {self.goal.y:.2f}m', ota=ota, ptfa=ptfa, sse=seq_start_end)
 
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:
