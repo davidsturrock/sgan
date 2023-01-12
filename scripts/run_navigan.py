@@ -27,7 +27,7 @@ def main(args):
     # ----------------------------------------------
     # Navigator setup
     nav_args = NavOptions().parse()
-    nav = Navigator(nav_args, args.model_path, agents=10, rate=1)
+    nav = Navigator(nav_args, args.model_path, rate=3)
 
     # -----------------------------------------------
     count = 0
@@ -41,13 +41,13 @@ def main(args):
     # obs_traj = make_scene(count, tf, tf1, tfs)
     # nav.obs_traj = obs_traj
     # nav.obs_traj = torch.zeros((8, 1, 2))
-
-    while not nav.callback_status:
+    print('Waiting for wheel odometry')
+    while not nav.odom_callback_status:
         pass
-    print('Wheel Odom received')
-    # while False in np.all([nav.obs_traj[::, 0, 0].numpy()], axis=0):
-    #     pass
-    # print('8 points observed.')
+    print('Wheel odometry received')
+    while False in np.all([nav.obs_traj[::, 0, 0].numpy()], axis=0):
+        pass
+    print('Husky observed for 8 timesteps. Now waiting for goal')
     while not nav.goal_status:
         pass
     print('Goal received')

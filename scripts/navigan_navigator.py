@@ -52,7 +52,12 @@ class ControlParameters:
 
 class Navigator:
 
-    def __init__(self, args, model_path, agents=10, rate=1):
+    def __init__(self, args, model_path, agents=9, rate=1, odom_topic='odometry/filtered'):
+
+        self.odom_callback_status = False
+        self.tracked_agents = []
+        self.husky_odom = []
+        self.odom_topic=odom_topic
         self.plotter = Plotter()
         self.goal = None
         self.goal_status = False
@@ -67,7 +72,7 @@ class Navigator:
         self.obs_len = self.generator.goal.obs_len
         self.pred_len = self.generator.goal.pred_len
         self.agents = agents
-        self.obs_traj = torch.zeros((self.obs_len, agents, 2), device=_DEVICE_)
+        self.obs_traj = torch.zeros((self.obs_len, 1 + agents, 2), device=_DEVICE_)
 
         self.published_points = []
         self.tfs = []
@@ -78,9 +83,11 @@ class Navigator:
         rospy.init_node('naviganNavigator', anonymous=True)
 
         self.last_callback = time.perf_counter()
+        self.odom_last_callback = time.perf_counter()
         self.rate_value = rate
         self.rate = rospy.Rate(self.rate_value)
-        self.odom_sub = rospy.Subscriber('/tracked/pedestrians', Point, self.callback)
+        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
+        self.ped_sub = rospy.Subscriber('/tracked/pedestrians', Point, self.callback)
         self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
         self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
 
@@ -146,24 +153,41 @@ class Navigator:
         return cmd_vel
 
     def callback(self, tracked_pts: Point):
-        """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
-        # limit update rate to self.rate_value
-        # self.odom = tracked_pts.pose
-        if 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
+        """update_obs_traj when a new list msg of tracked pts are received from the object tracker
+        NOTE: 1 is added to agent index because obs_traj row zero is for husky and is updated via wheel odom"""
+        # check tracked agent is within limit and limit update rate to self.rate_value
+        if int(tracked_pts.z) > self.agents or 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
             return
-        # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
-        # Slide all points fwd a timestep
-        self.obs_traj[:-1] = self.obs_traj.clone()[1:]
-        # From agent 0 (Husky) to agent 9 update
-        # x and y coordinate from object tracker
-        # point.z value contains agent id no.
-        self.obs_traj[-1, int(tracked_pts.z), 0] = tracked_pts.x
-        self.obs_traj[-1, int(tracked_pts.z), 1] = tracked_pts.y
-        # for i, pt in enumerate(tracked_pts):
-        #     self.obs_traj[-1, i, 0] = pt[0]
-        #     self.obs_traj[-1, i, 1] = pt[1]
+        # # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
+        # Slide selected agent's points fwd a timestep
+        self.obs_traj[:-1, 1 + int(tracked_pts.z)] = self.obs_traj.clone()[1:, 1 + int(tracked_pts.z)]
+        # # From agent 0 (Husky) to agent 9 update
+        # # x and y coordinate from object tracker
+        # # point.z value contains agent id no.
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
+        # # for i, pt in enumerate(tracked_pts):
+        # #     self.obs_traj[-1, i, 0] = pt[0]
+        # #     self.obs_traj[-1, i, 1] = pt[1]
         self.last_callback = time.perf_counter()
         self.callback_status = True
+
+    def odom_callback(self, odom: Odometry):
+        """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
+        # limit update rate to self.rate_value
+        if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
+            return
+        self.odom = odom.pose
+        # self.husky_odom.append([self.odom.pose.position.x, self.odom.pose.position.y])
+        # Slide husky points along by one
+        self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
+        # Update latest observed pts with new odom x and y
+        self.obs_traj[-1, 0, 0] = self.odom.pose.position.x
+        self.obs_traj[-1, 0, 1] = self.odom.pose.position.y
+        # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
+        self.odom_callback_status = True
+
+        self.odom_last_callback = time.perf_counter()
 
     def goal_callback(self, goal: Point):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
@@ -189,6 +213,8 @@ class Navigator:
 
             ota = self.obs_traj.numpy()
             ptga = pred_traj_gt.numpy()
+            # self.obs_traj[::, 0] = self.husky_odom[-8::]
+            # self.obs_traj[::, 1::] = self.tracked_agents[-8::]
             pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, 1)
             start_pos = self.obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
