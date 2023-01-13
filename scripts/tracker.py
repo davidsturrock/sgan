@@ -80,7 +80,7 @@ class Tracker:
                 # point( x coord, y coord, agent id no.)
                 point = Point(tracks[agent_id, 0], tracks[agent_id, 1], agent_id)
                 self.publisher.publish(point)
-                time.sleep(0.1)
+                time.sleep(0.05)
 
         self.lidar_last_callback = time.perf_counter()
 

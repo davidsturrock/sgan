@@ -57,7 +57,7 @@ class Navigator:
         self.odom_callback_status = False
         self.tracked_agents = []
         self.husky_odom = []
-        self.odom_topic=odom_topic
+        self.odom_topic = odom_topic
         self.plotter = Plotter()
         self.goal = None
         self.goal_status = False
@@ -140,8 +140,8 @@ class Navigator:
         # print(f'Yaw: {yaw} deg.')
         # if logging, log the tf for path tracking purposes
         # if self.logger is not None:
-            # TODO add source and dest timestamps to logging
-            # self.logger.write_to_file(tf.astype(dtype=np.float64), 0, 1)
+        # TODO add source and dest timestamps to logging
+        # self.logger.write_to_file(tf.astype(dtype=np.float64), 0, 1)
 
         cmd_vel.angular.z = -self.control_params.pz * (0 - yaw)
         # Bound the output of controller to within max values
@@ -161,7 +161,7 @@ class Navigator:
         # check tracked agent is within limit and limit update rate to self.rate_value
         # if int(tracked_pts.z) > self.agents or 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
         #     return
-        print(f'Agent ID: {tracked_pts.z} x: {tracked_pts.x:.2f}m y: {tracked_pts.y:.2f}m')
+        # print(f'Agent ID: {tracked_pts.z} x: {tracked_pts.x:.2f}m y: {tracked_pts.y:.2f}m')
         # # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
         # Slide selected agent's points fwd a timestep
         self.obs_traj[:-1, 1 + int(tracked_pts.z)] = self.obs_traj.clone()[1:, 1 + int(tracked_pts.z)]
@@ -197,8 +197,8 @@ class Navigator:
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
         self.goal = goal
-        self.goal.x -= self.obs_traj[-1,0,0].item()
-        self.goal.y -= self.obs_traj[-1,0,1].item()
+        self.goal.x -= self.obs_traj[-1, 0, 0].item()
+        self.goal.y -= self.obs_traj[-1, 0, 1].item()
         self.goal_status = True
 
     def seek_live_goal(self, agent_id=0, title='live_exp'):
@@ -215,7 +215,7 @@ class Navigator:
                 goal_state[0, agent_id, 0] = self.goal.x
                 # goal_state[0, agent_id, 1] = y
                 goal_state[0, agent_id, 1] = self.goal.y
-                print(f'X {self.goal.x:.2f}, Y {self.goal.y:.2f}')
+                # print(f'X {self.goal.x:.2f}, Y {self.goal.y:.2f}')
                 # print(goal_state.shape)
 
             ota = self.obs_traj.numpy()
@@ -230,7 +230,8 @@ class Navigator:
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-            self.plotter.display(title=f'x: {self.goal.x:.2f}m y: {self.goal.y:.2f}m', ota=ota, ptfa=ptfa, sse=seq_start_end)
+            self.plotter.display(title=f'x: {self.goal.x:.2f}m y: {self.goal.y:.2f}m', ota=ota, ptfa=ptfa,
+                                 sse=seq_start_end)
 
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:

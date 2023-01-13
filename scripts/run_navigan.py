@@ -54,16 +54,25 @@ def main(args):
     # print(nav.obs_traj[::, 0].T)
     # print()
     # sys.exit(0)
+    goal_tfs = []
+    accum_time = 0
     while not rospy.is_shutdown():
         start = time.perf_counter()
         # x, y = (t.item() for t in obs_traj[-1, 0])
-        pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}')
-        goal_tfs = pts_to_tfs(pred_rel)
-        nav.goal_step(goal_tfs[0])
-        count += 1
+        if len(goal_tfs) < 8:
+            pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}')
+            goal_tfs = list(pts_to_tfs(pred_rel))
+        nav.goal_step(goal_tfs.pop(0))
         # nav.sleep()
         # print(nav.obs_traj.T)
-        print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
+        # print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
+        accum_time += time.perf_counter() - start
+
+        if count == 5:
+            print(f"5 Loop Avg. Loop rate {1 / (accum_time/count):.2f}Hz")
+            count = 0
+            accum_time = 0
+        count += 1
         # if count > 10:
 
         # if count >= 2:
