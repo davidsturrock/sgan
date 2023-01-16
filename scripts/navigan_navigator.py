@@ -88,7 +88,7 @@ class Navigator:
         self.rate = rospy.Rate(self.rate_value)
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
         self.ped_sub = rospy.Subscriber('/tracked/pedestrians', Point, self.callback)
-        self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
+        # self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
         # self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
         self.publisher: rospy.Publisher = rospy.Publisher('/relay', Twist, queue_size=1, latch=True)
 
@@ -122,7 +122,7 @@ class Navigator:
                 msg = self.controller(tf)
                 self.publisher.publish(msg)
             else:
-                print(f'{x} > {self.control_params.dthresh} or {abs(turn_angle)} > {self.control_params.ythresh}')
+                print(f'{x:.2f} > {self.control_params.dthresh} or {abs(turn_angle):.2f} > {self.control_params.ythresh}')
 
     def controller(self, tf):
         """Controller now assumes TF is within bounds. Check must be performed at higher level"""
@@ -162,14 +162,17 @@ class Navigator:
         # if int(tracked_pts.z) > self.agents or 1 / (time.perf_counter() - self.last_callback) > self.rate_value:
         #     return
         # print(f'Agent ID: {tracked_pts.z} x: {tracked_pts.x:.2f}m y: {tracked_pts.y:.2f}m')
+        # print(f'X = y + obs_traj[-1, 0 ,0] = {tracked_pts.y:.2f} + {self.obs_traj[-1, 0, 0].item():.2f} = {tracked_pts.y + self.obs_traj[-1, 0, 0].item():.2f}m')
+        # print(f'Y = -x + obs_traj[-1, 0 ,1] = {-tracked_pts.x:.2f} + {self.obs_traj[-1, 0, 1].item():.2f} = {-tracked_pts.x + self.obs_traj[-1, 0, 1].item():.2f}m')
         # # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
         # Slide selected agent's points fwd a timestep
         self.obs_traj[:-1, 1 + int(tracked_pts.z)] = self.obs_traj.clone()[1:, 1 + int(tracked_pts.z)]
         # # From agent 0 (Husky) to agent 9 update
         # # x and y coordinate from object tracker
         # # point.z value contains agent id no.
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
+        # TODO flipping x and -y for now because of wrong axes from tracker
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.y + self.obs_traj[-1, 0, 0].item()
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = -tracked_pts.x + self.obs_traj[-1, 0, 1].item()
         # # for i, pt in enumerate(tracked_pts):
         # #     self.obs_traj[-1, i, 0] = pt[0]
         # #     self.obs_traj[-1, i, 1] = pt[1]
@@ -180,7 +183,8 @@ class Navigator:
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
         # if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
-        #     return
+        if 1 / (time.perf_counter() - self.odom_last_callback) > 10:
+            return
         self.odom = odom.pose
         # self.husky_odom.append([self.odom.pose.position.x, self.odom.pose.position.y])
         # Slide husky points along by one
@@ -201,7 +205,8 @@ class Navigator:
         self.goal.y -= self.obs_traj[-1, 0, 1].item()
         self.goal_status = True
 
-    def seek_live_goal(self, agent_id=0, title='live_exp'):
+    def seek_live_goal(self, agent_id=0, x=40, y=0, title='live_exp'):
+        self.goal = Point(x - self.obs_traj[-1, 0, 0].item() , y - self.obs_traj[-1, 0, 1].item(), 0)
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
             obs_traj_rel = abs_to_relative(self.obs_traj)
@@ -217,12 +222,14 @@ class Navigator:
                 goal_state[0, agent_id, 1] = self.goal.y
                 # print(f'X {self.goal.x:.2f}, Y {self.goal.y:.2f}')
                 # print(goal_state.shape)
-
-            ota = self.obs_traj.numpy()
+            # ota = self.obs_traj.numpy()
             ptga = pred_traj_gt.numpy()
             # self.obs_traj[::, 0] = self.husky_odom[-8::]
             # self.obs_traj[::, 1::] = self.tracked_agents[-8::]
-            # print(self.obs_traj[::,0].T)
+            # with np.printoptions(precision=2, suppress=True):
+            #     print(self.obs_traj[::, 0:2, 0].T)
+            #     print(self.obs_traj[::, 0:2, 1].T)
+                # print(self.obs_traj[, 1].T)
             pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
             start_pos = self.obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
@@ -230,7 +237,7 @@ class Navigator:
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-            self.plotter.display(title=f'x: {self.goal.x:.2f}m y: {self.goal.y:.2f}m', ota=ota, ptfa=ptfa,
+            self.plotter.display(title=f'x: {self.goal.x:.2f}m y: {self.goal.y:.2f}m', ota=self.obs_traj, ptfa=ptfa,
                                  sse=seq_start_end)
 
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):

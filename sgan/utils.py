@@ -160,7 +160,7 @@ class Plotter:
                 else:
                     # Only plot an agent if 8 non-zero points are observed
                     # if True in np.all([ota[::, j, 0]], axis=0):
-                    self.ax.plot(ota[::, j, 1], -ota[::, j, 0], c=cmap[j - 1], linestyle='', marker='.',
+                    self.ax.plot(ota[::, j, 0], ota[::, j, 1], c=cmap[j - 1], linestyle='', marker='.',
                                  markersize=2)
                                      # )
 

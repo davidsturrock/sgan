@@ -5,6 +5,7 @@ import rospy
 import sys
 
 sys.path.insert(0, '/home/administrator/code/aru_sil_py/navigation/__init__.py')
+sys.path.insert(0, '/home/administrator/code/sgan')
 import argparse
 import os
 import torch
@@ -47,10 +48,10 @@ def main(args):
     print('Wheel odometry received')
     while False in np.all([nav.obs_traj[::, 0, 0].numpy()], axis=0):
         pass
-    print('Husky observed for 8 timesteps. Now waiting for goal')
-    while not nav.goal_status:
-        pass
-    print('Goal received')
+    print('Husky observed for 8 timesteps.')
+    #while not nav.goal_status:
+    #    time.sleep(0.1)
+    #print('Goal received')
     # print(nav.obs_traj[::, 0].T)
     # print()
     # sys.exit(0)
@@ -64,7 +65,8 @@ def main(args):
             goal_tfs = list(pts_to_tfs(pred_rel))
         nav.goal_step(goal_tfs.pop(0))
         # nav.sleep()
-        # print(nav.obs_traj.T)
+        # with np.printoptions(precision=2, suppress=True):
+        #     print(nav.obs_traj.T)
         # print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
         accum_time += time.perf_counter() - start
 
