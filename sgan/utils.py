@@ -122,8 +122,10 @@ class Plotter:
 
         plt.axis('square')
         plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-        self.ax.set_xlim(self.xlim)
-        self.ax.set_ylim(self.ylim)
+        # self.ax.set_xlim(self.xlim)
+        # self.ax.set_ylim(self.ylim)
+        self.ax.set_xlim([-2.5, 10])
+        self.ax.set_ylim([-5,5])
         # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
     def display(self, title, ota, ptfa, sse, save_name='live_plot', save_dir=' /home/administrator/code/sgan/plots'):
@@ -138,11 +140,14 @@ class Plotter:
         self.ax.set_xlabel('X [m]')
         self.ax.set_ylabel('Y [m]')
 
+        # loc = 'center left',
         plt.axis('square')
         plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-        self.ax.set_xlim(self.xlim)
-        self.ax.set_ylim(self.ylim)
-        plt.title(f'{title}')
+        # self.ax.set_xlim(self.xlim)
+        self.ax.set_xlim([-2.5, 10])
+        # self.ax.set_ylim(self.ylim)
+        self.ax.set_ylim([-5,5])
+        plt.title(f'Distance to goal\n{title}')
 
         for s, e in sse[::, ::]:
             for j in range(s, e):
@@ -154,18 +159,27 @@ class Plotter:
                 if j == 0:
                     self.ax.scatter(ota[-1, j, 0], ota[-1, j, 1], c="r", marker=".", zorder=10)
                                     # , label='live location')
-                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*', markersize=2)
+                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*')
+                    # markersize=2)
                                  # ,label='planned path')
                 # Plot pedestrians
                 else:
                     # Only plot an agent if 8 non-zero points are observed
                     # if True in np.all([ota[::, j, 0]], axis=0):
-                    self.ax.plot(ota[::, j, 0], ota[::, j, 1], c=cmap[j - 1], linestyle='', marker='.',
-                                 markersize=2)
-                                     # )
+                    self.ax.plot(ota[::, j, 0], ota[::, j, 1], c=cmap[j - 1], linestyle='', marker='.')
+                                 # ,markersize=2)
+                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c=cmap[j - 1], linestyle='', marker='*')
 
             self.ax.plot(self.prev_x[-8::], self.prev_y[-8::], linestyle=None, marker='.', markersize=1, c='dimgrey')
-        self.ax.legend()
+        # self.ax.legend()
+        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
+                                 markersize=5, label='observed agent points')
+        # x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
+        #                        markersize=5, label='Pred_traj_gt')
+        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
+                                  markersize=5, label='predicted agent points')
+
+        self.ax.legend(bbox_to_anchor=(1.2, 1), loc='center right', handles=[dot_line, star_line])
         self.fig.canvas.draw()
         #TODO fix savefig error on Husky
         if self.save:
@@ -174,8 +188,9 @@ class Plotter:
             print(f'{save_file}')
             plt.savefig(save_file)
 
-    def save_video(self):
-        write_plots_to_video()
+    def save_video(self, directory='/home/david/Pictures/plots/lidar/'):
+        write_plots_to_video(directory)
+        sys.exit(0)
 
 
 def int_tuple(s):
