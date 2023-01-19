@@ -249,9 +249,12 @@ def get_goal_point(data, pred_len, last_obs):
         return torch.zeros((1, 2), device=_DEVICE_)
 
 
-def create_goal_state(dpath, pred_len, obs_traj):
-    goal_state = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
-    last_obs = obs_traj[-1, 0]
+def create_goal_state(dpath, pred_len, goal_obs_traj):
+    """
+    goal_obs_traj = obs_traj[::, [index[0] for index in seq_start_end]]
+    """
+    goal_state = torch.zeros((1, goal_obs_traj.shape[1], 2), device=_DEVICE_)
+    last_obs = goal_obs_traj[-1, 0]
     # print(f'Last obs: {last_obs}')
     # Search through training text files for a matching last observed (x,y)
     for filename in Path(dpath).rglob('*'):

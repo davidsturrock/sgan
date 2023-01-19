@@ -1,3 +1,4 @@
+import numpy as np
 import sys
 
 import torch
@@ -32,12 +33,12 @@ class Encoder(nn.Module):
     TrajectoryDiscriminator"""
 
     def __init__(
-            self, embedding_dim=64, h_dim=64, mlp_dim=1024, num_layers=1,
+            self, embedding_dim=64, h_dim=64, mlp_dim=64, num_layers=1,
             dropout=0.0, return_c=False
     ):
         super(Encoder, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.mlp_dim = 1024
+        self.mlp_dim = mlp_dim
         self.h_dim = h_dim
         self.embedding_dim = embedding_dim
         self.num_layers = num_layers
@@ -178,12 +179,12 @@ class PoolHiddenNet(nn.Module):
     """Pooling module as proposed in our paper"""
 
     def __init__(
-            self, embedding_dim=64, h_dim=64, mlp_dim=1024, bottleneck_dim=1024,
+            self, embedding_dim=64, h_dim=64, mlp_dim=64, bottleneck_dim=32,
             activation='relu', batch_norm=True, dropout=0.0
     ):
         super(PoolHiddenNet, self).__init__()
 
-        self.mlp_dim = 1024
+        self.mlp_dim = mlp_dim
         self.h_dim = h_dim
         self.bottleneck_dim = bottleneck_dim
         self.embedding_dim = embedding_dim
@@ -347,10 +348,10 @@ class SocialPooling(nn.Module):
 
 class TrajectoryGenerator(nn.Module):
     def __init__(
-            self, obs_len, pred_len, embedding_dim=64, encoder_h_dim=64,
-            decoder_h_dim=128, mlp_dim=1024, num_layers=1, noise_dim=(0,),
+            self, obs_len, pred_len, embedding_dim=16, encoder_h_dim=32,
+            decoder_h_dim=32, mlp_dim=64, num_layers=1, noise_dim=(0,),
             noise_type='gaussian', noise_mix_type='ped', pooling_type=None,
-            pool_every_timestep=True, dropout=0.0, bottleneck_dim=1024,
+            pool_every_timestep=True, dropout=0.0, bottleneck_dim=64,
             activation='relu', batch_norm=True, neighborhood_size=2.0, grid_size=8
     ):
         super(TrajectoryGenerator, self).__init__()
@@ -370,9 +371,9 @@ class TrajectoryGenerator(nn.Module):
         self.noise_mix_type = noise_mix_type
         self.noise_shape = None
         self.pooling_type = pooling_type
-        self.noise_first_dim = 0
+        self.noise_first_dim = noise_dim[0]
         self.pool_every_timestep = pool_every_timestep
-        self.bottleneck_dim = 1024
+        self.bottleneck_dim = bottleneck_dim
 
         self.encoder = Encoder(
             embedding_dim=embedding_dim,
@@ -549,7 +550,7 @@ class TrajectoryGenerator(nn.Module):
 
 class TrajectoryDiscriminator(nn.Module):
     def __init__(
-            self, obs_len, pred_len, embedding_dim=64, h_dim=64, mlp_dim=1024,
+            self, obs_len, pred_len, embedding_dim=16, h_dim=64, mlp_dim=64,
             num_layers=1, activation='relu', batch_norm=True, dropout=0.0,
             d_type='local'
     ):
@@ -617,10 +618,9 @@ class TrajectoryDiscriminator(nn.Module):
 
 class IntentionForceGenerator(nn.Module):
     def __init__(
-            self, obs_len, pred_len, embedding_dim=64, encoder_h_dim=64,
-            decoder_h_dim=128, mlp_dim=1024, num_layers=1, dropout=0.0, bottleneck_dim=1024,
-            activation='relu', batch_norm=True, neighborhood_size=2.0, grid_size=8, pooling_type=None,
-            pool_every_timestep=True):
+            self, obs_len, pred_len, embedding_dim=16, encoder_h_dim=64,
+            decoder_h_dim=34, mlp_dim=64, num_layers=1, dropout=0.0, bottleneck_dim=32,
+            activation='relu', batch_norm=True):
         super(IntentionForceGenerator, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.obs_len = obs_len
@@ -630,7 +630,7 @@ class IntentionForceGenerator(nn.Module):
         self.decoder_h_dim = decoder_h_dim
         self.embedding_dim = embedding_dim
         self.num_layers = num_layers
-        self.bottleneck_dim = 1024
+        self.bottleneck_dim = bottleneck_dim
 
         self.encoder = Encoder(
             embedding_dim=embedding_dim,
@@ -644,32 +644,26 @@ class IntentionForceGenerator(nn.Module):
         self.decoder = Decoder(
             pred_len,
             embedding_dim=embedding_dim,
-            h_dim=decoder_h_dim // 2,
+            h_dim=decoder_h_dim,
             mlp_dim=mlp_dim,
             num_layers=num_layers,
-            pool_every_timestep=pool_every_timestep,
             dropout=dropout,
             bottleneck_dim=bottleneck_dim,
             activation=activation,
             batch_norm=batch_norm,
-            pooling_type=pooling_type,
-            grid_size=grid_size,
-            neighborhood_size=neighborhood_size
-        )
+            pool_every_timestep=False)
 
     def forward(self, obs_traj, obs_traj_rel, seq_start_end, goal_point=None):
         """
         Inputs:
-        - obs_traj: Tensor of shape (obs_len, batch, 2)
-        - obs_traj_rel: Tensor of shape (obs_len, batch, 2)
+        - obs_traj: Tensor of shape (obs_len, len(seq_start_end), 2)
+        - obs_traj_rel: Tensor of shape (obs_len, len(seq_start_end), 2)
         - seq_start_end: A list of tuples which delimit sequences within batch.
         - user_noise: Generally used for inference when you want to see
         relation between different types of noise and outputs.
         Output:
-        - pred_traj_rel: Tensor of shape (self.pred_len, batch, 2)
+        - pred_traj_rel: Tensor of shape (self.pred_len, len(seq_start_end), 2)
         """
-        batch = obs_traj_rel.size(1)
-        # print(f'batch size: {batch}')
         # print(f'obs_traj_rel: {obs_traj_rel.shape}')
         # Encode seq
         final_encoder_h, final_encoder_c = self.encoder(obs_traj_rel, )
@@ -680,11 +674,12 @@ class IntentionForceGenerator(nn.Module):
         torch.set_printoptions(precision=2)
         # print(f'End point sample: {obs_traj[-1, 0: 10]}')
         if goal_point is None:
-            goal_point = torch.zeros((1, batch, 2), device=self.device)
+            goal_point = torch.zeros((1, obs_traj.shape[1], 2), device=self.device)
             # obs_traj[-1].reshape(1, batch, 2)
         final_encoder_h = torch.cat([final_encoder_h, goal_point], dim=2)
         # Pad cell tensor with zeros to make dims of h and c equal which is needed by decoder's input
-        final_encoder_c = torch.cat([final_encoder_c, torch.zeros((1, batch, 2), device=self.device)], dim=2)
+        final_encoder_c = torch.cat([final_encoder_c, torch.zeros((1, obs_traj.shape[1], 2), device=self.device)],
+                                    dim=2)
         # final_encoder_c = torch.cat([final_encoder_c, goal_point], dim=2)
         # print(f'final_h shape with goal: {final_encoder_h.size()}')
         state_tuple = (final_encoder_h, final_encoder_c)
@@ -720,11 +715,19 @@ class CombinedGenerator(nn.Module):
 
         self.goal = IntentionForceGenerator(obs_len, pred_len, embedding_dim, encoder_h_dim,
                                             decoder_h_dim, mlp_dim, num_layers, dropout, bottleneck_dim,
-                                            activation, batch_norm, neighborhood_size, grid_size, pooling_type,
-                                            pool_every_timestep)
+                                            activation, batch_norm)
 
-    def forward(self, obs_traj, obs_traj_rel, seq_start_end, goal_point=None, goal_aggro=0.5):
-        social_traj = self.social(obs_traj, obs_traj_rel, seq_start_end)
-        goal_traj = self.goal(obs_traj, obs_traj_rel, seq_start_end, goal_point)
+    def forward(self, obs_traj, obs_traj_rel, seq_start_end, goal_point=None, goal_aggro=0.5, split=False):
+        pred_traj_rel = self.social(obs_traj, obs_traj_rel, seq_start_end)
+        goal_agent_indices = [index[0].item() for index in seq_start_end]
+        goal_obs_traj = obs_traj[::, goal_agent_indices]
+        goal_obs_traj_rel = obs_traj_rel[::, goal_agent_indices]
+        goal_traj = self.goal(goal_obs_traj, goal_obs_traj_rel, seq_start_end, goal_point)
+        # Mostly for plotting influence of each network
+        if split:
+            return pred_traj_rel, goal_traj
         # For now take average of the social and goal generators outputs as the final traj
-        return ((1 - goal_aggro) * social_traj + goal_aggro * goal_traj) / 2
+        for i, goal_idx in enumerate(goal_agent_indices):
+            pred_traj_rel[::, i] = ((1 - goal_aggro) * pred_traj_rel[::, goal_idx] + goal_aggro * goal_traj[::, i]) / 2
+
+        return pred_traj_rel

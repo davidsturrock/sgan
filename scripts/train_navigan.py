@@ -54,7 +54,7 @@ parser.add_argument('--mlp_dim', default=64, type=int)
 
 # Generator Options
 parser.add_argument('--encoder_h_dim_g', default=32, type=int)
-parser.add_argument('--decoder_h_dim_g', default=68, type=int)
+parser.add_argument('--decoder_h_dim_g', default=34, type=int)
 parser.add_argument('--noise_dim', default=(0,), type=int_tuple)
 parser.add_argument('--noise_type', default='gaussian')
 parser.add_argument('--noise_mix_type', default='global')
@@ -379,8 +379,8 @@ def discriminator_step(args, batch, dset_path, generator, discriminator, d_loss_
     losses = {}
     loss = torch.zeros(1).to(pred_traj_gt)
     # Using final predicted ground truth point as goal point during training.
-    # generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
-    goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len, obs_traj=obs_traj)
+    goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
+                                   goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]])
     generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
 
     pred_traj_fake_rel = generator_out
@@ -426,7 +426,8 @@ def generator_step(args, batch, dset_path, generator, discriminator, g_loss_fn, 
         # Using final predicted ground truth point as goal point during training.
         # generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
         # Using 3*pred_len as goal pt during training
-        goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len, obs_traj=obs_traj)
+        goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
+                                       goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]])
         generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
 
         pred_traj_fake_rel = generator_out
@@ -490,7 +491,8 @@ def check_accuracy(args, loader, dset_path, generator, discriminator, d_loss_fn,
             linear_ped = 1 - non_linear_ped
             loss_mask = loss_mask[:, args.obs_len:]
             # Using 3*pred_len as goal pt during training
-            goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len, obs_traj=obs_traj)
+            goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
+                                           goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]])
             pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
             # Using final predicted ground truth point as goal point during training.
             # pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
