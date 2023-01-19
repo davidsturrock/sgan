@@ -8,7 +8,7 @@ from attrdict import AttrDict
 from pathlib import Path
 
 from scripts.evaluate_model import evaluate_helper
-from scripts.goal import seek_goal, count_suitable_target_agents_in_dataset, seek_goal_simulated_data
+from scripts.goal import seek_goal, count_suitable_target_agents_in_dataset, seek_goal_simulated_data, create_goal_state
 from scripts.model_loaders import get_combined_generator
 from sgan.data.loader import data_loader
 from sgan.data.trajectories import read_file
@@ -22,7 +22,7 @@ parser.add_argument('--dset_type', default='test', type=str)
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def evaluate(args, loader, dset, generator, num_samples):
+def evaluate(args, loader, dset, generator, num_samples, dset_path):
     ade_outer, fde_outer = [], []
     total_traj = 0
 
@@ -39,8 +39,9 @@ def evaluate(args, loader, dset, generator, num_samples):
             ota = obs_traj.numpy()
 
             for _ in range(num_samples):
-                pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end,
-                                               pred_traj_gt[-1].reshape(1, -1, 2))
+                goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
+                                               goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]])
+                pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
                 pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
 
                 ade.append(displacement_error(pred_traj_fake, pred_traj_gt, mode='raw'))
@@ -85,9 +86,9 @@ def main(args):
 
         # plot_losses(checkpoint, train=True)
         # sys.exit(0)
-        # ade, fde = evaluate(_args, loader, dset, generator, args.num_samples)
-        # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
-        #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
+        ade, fde = evaluate(_args, loader, dset, generator, args.num_samples, dpath)
+        print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
+              f' ADE: {ade:.2f}, FDE: {fde:.2f}')
 
         # count_suitable_target_agents_in_dataset(dpath, loader, generator)
         # print(f'No. of seqs: {len(dset)}')
