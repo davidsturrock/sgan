@@ -233,7 +233,6 @@ def plot_losses(checkpoint, train:bool=True):
     # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
     plt.show()
-    plt.waitforbuttonpress()
     plt.close(fig)
 
 def write_plots_to_video():
