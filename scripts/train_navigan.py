@@ -63,7 +63,8 @@ parser.add_argument('--g_learning_rate', default=1e-3, type=float)
 parser.add_argument('--g_steps', default=1, type=int)
 
 # Pooling Options
-parser.add_argument('--pooling_type', default='pool_net')
+# parser.add_argument('--pooling_type', default='pool_net')
+parser.add_argument('--pooling_type', default='spool')
 parser.add_argument('--pool_every_timestep', default=0, type=bool_flag)
 
 # Pool Net Option
@@ -144,8 +145,7 @@ def main(args):
     if args.checkpoint_start_from is not None:
         restore_path = args.checkpoint_start_from
     elif args.restore_from_checkpoint == 1:
-        restore_path = os.path.join(args.output_dir,
-                                    '%s_with_model.pt' % args.checkpoint_name)
+        restore_path = os.path.join(args.output_dir, f'{args.checkpoint_name}.pt')
 
     if restore_path is not None and os.path.isfile(restore_path):
         logger.info('Restoring from checkpoint {}'.format(restore_path))
