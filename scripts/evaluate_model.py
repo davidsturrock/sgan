@@ -363,30 +363,6 @@ def main(args):
         seek_goal_simulated_data(generator, iters=50)
 
 
-def create_goal_states(obs_traj, pred_traj_gt, seq_start_end):
-    plot_trajectories(obs_traj, pred_traj_gt, pred_traj_gt * 0, seq_start_end.numpy())
-    chosen_ped_id, x, y = manual_goal_select(obs_traj, pred_traj_gt)
-
-    goal_point = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
-    goal_point[0, chosen_ped_id, 0] = x
-    goal_point[0, chosen_ped_id, 1] = y
-    print(f'Goal Point:\n{goal_point}')
-    return goal_point
-
-
-def manual_goal_select(obs_traj, pred_traj_gt):
-    chosen_ped_id = int(input(f'Choose pedestrian [0... {obs_traj.shape[1] - 1}]to give goal: '))
-    for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
-        if i == chosen_ped_id:
-            print(f'Ped {i} observed traj\n\t\t\tX\t\tY\n{ped}')
-    for i, ped in enumerate(pred_traj_gt.permute(1, 0, 2)):
-        if i == chosen_ped_id:
-            print(f'Ped {i} predicted gt\n\t\t\tX\t\tY\n{ped}')
-    x = int(input('Choose x goal: '))
-    y = int(input('Choose y goal: '))
-    return chosen_ped_id, x, y
-
-
 if __name__ == '__main__':
     args = parser.parse_args()
     # args.model_path = '/home/david/data/sgan-models/checkpoint_intention_with_model.pt'
