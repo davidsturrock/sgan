@@ -122,10 +122,10 @@ class Plotter:
 
         plt.axis('square')
         plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-        # self.ax.set_xlim(self.xlim)
-        # self.ax.set_ylim(self.ylim)
-        self.ax.set_xlim([-2.5, 10])
-        self.ax.set_ylim([-5,5])
+        self.ax.set_xlim(self.xlim)
+        self.ax.set_ylim(self.ylim)
+        # self.ax.set_xlim([-2.5, 10])
+        # self.ax.set_ylim([-5,5])
         # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
     def display(self, title, ota, ptfa, sse, save_name='live_plot', save_dir=' /home/administrator/code/sgan/plots'):
@@ -143,10 +143,10 @@ class Plotter:
         # loc = 'center left',
         plt.axis('square')
         plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-        # self.ax.set_xlim(self.xlim)
-        self.ax.set_xlim([-2.5, 10])
-        # self.ax.set_ylim(self.ylim)
-        self.ax.set_ylim([-5,5])
+        self.ax.set_xlim(self.xlim)
+        # self.ax.set_xlim([-2.5, 10])
+        self.ax.set_ylim(self.ylim)
+        # self.ax.set_ylim([-5,5])
         plt.title(f'Distance to goal\n{title}')
 
         for s, e in sse[::, ::]:
@@ -168,7 +168,7 @@ class Plotter:
                     # if True in np.all([ota[::, j, 0]], axis=0):
                     self.ax.plot(ota[::, j, 0], ota[::, j, 1], c=cmap[j - 1], linestyle='', marker='.')
                                  # ,markersize=2)
-                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c=cmap[j - 1], linestyle='', marker='*')
+                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c=cmap[j - 1], linestyle='', markersize=1, marker='*')
 
             self.ax.plot(self.prev_x[-8::], self.prev_y[-8::], linestyle=None, marker='.', markersize=1, c='dimgrey')
         # self.ax.legend()
