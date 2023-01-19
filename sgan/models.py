@@ -38,7 +38,7 @@ class Encoder(nn.Module):
     ):
         super(Encoder, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.mlp_dim = mlp_dim
+        self.mlp_dim = 1024
         self.h_dim = h_dim
         self.embedding_dim = embedding_dim
         self.num_layers = num_layers
@@ -184,7 +184,7 @@ class PoolHiddenNet(nn.Module):
     ):
         super(PoolHiddenNet, self).__init__()
 
-        self.mlp_dim = mlp_dim
+        self.mlp_dim = 1024
         self.h_dim = h_dim
         self.bottleneck_dim = bottleneck_dim
         self.embedding_dim = embedding_dim
@@ -373,7 +373,7 @@ class TrajectoryGenerator(nn.Module):
         self.pooling_type = pooling_type
         self.noise_first_dim = noise_dim[0]
         self.pool_every_timestep = pool_every_timestep
-        self.bottleneck_dim = bottleneck_dim
+        self.bottleneck_dim = 1024
 
         self.encoder = Encoder(
             embedding_dim=embedding_dim,
@@ -630,7 +630,7 @@ class IntentionForceGenerator(nn.Module):
         self.decoder_h_dim = decoder_h_dim
         self.embedding_dim = embedding_dim
         self.num_layers = num_layers
-        self.bottleneck_dim = bottleneck_dim
+        self.bottleneck_dim = 1024
 
         self.encoder = Encoder(
             embedding_dim=embedding_dim,
