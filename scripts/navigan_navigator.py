@@ -72,8 +72,11 @@ class Navigator:
         self.obs_len = self.generator.goal.obs_len
         self.pred_len = self.generator.goal.pred_len
         self.agents = agents
-        self.obs_traj = torch.zeros((self.obs_len, 1 + agents, 2), device=_DEVICE_)
-
+        # self.obs_traj = torch.zeros((self.obs_len, 1 + agents, 2), device=_DEVICE_)
+        # TODO consider best solution to init agent values
+        # Initialise agents far awa to avoid influencing Husky planned path
+        self.obs_traj = torch.ones((self.obs_len, 1 + agents, 2), device=_DEVICE_) * 100
+        self.obs_traj[::, 0] = 0
         self.published_points = []
         self.tfs = []
         self.tf_to_last_loc = np.eye(4)
@@ -171,8 +174,10 @@ class Navigator:
         # # x and y coordinate from object tracker
         # # point.z value contains agent id no.
         # TODO flipping x and -y for now because of wrong axes from tracker
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.y + self.obs_traj[-1, 0, 0].item()
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = -tracked_pts.x + self.obs_traj[-1, 0, 1].item()
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x
+                                                       # + self.obs_traj[-1, 0, 0].item()
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
+                                                       # + self.obs_traj[-1, 0, 1].item()
         # # for i, pt in enumerate(tracked_pts):
         # #     self.obs_traj[-1, i, 0] = pt[0]
         # #     self.obs_traj[-1, i, 1] = pt[1]
@@ -205,7 +210,7 @@ class Navigator:
         self.goal.y -= self.obs_traj[-1, 0, 1].item()
         self.goal_status = True
 
-    def seek_live_goal(self, agent_id=0, x=40, y=0, title='live_exp'):
+    def seek_live_goal(self, agent_id=0, x=40, y=10, title='live_exp'):
         self.goal = Point(x - self.obs_traj[-1, 0, 0].item() , y - self.obs_traj[-1, 0, 1].item(), 0)
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
