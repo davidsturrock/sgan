@@ -1,4 +1,3 @@
-
 import time
 
 import rospy
@@ -10,6 +9,7 @@ from sensor_msgs import point_cloud2
 from sensor_msgs.msg import PointCloud2
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
+
 sys.path.insert(0, '/home/administrator/code/aru-core/ped/lib/')
 # import aru_py_logger
 import aru_py_pedestrian
@@ -32,10 +32,11 @@ class Tracker:
         self.lidar_last_callback = time.perf_counter()
         self.pedestrian = None
         self.odom_callback_status = False
+
     def setup(self):
         self.pedestrian = aru_py_pedestrian.PyPedestrian("name")
         rospy.init_node('PedestrianTracker')
-        # self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
+        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
         self.lidar_sub = rospy.Subscriber(self.lidar_topic, PointCloud2, self.lidar_callback)
         self.publisher: rospy.Publisher = rospy.Publisher(self.pub_topic, Point, queue_size=1)
         self.rate = rospy.Rate(self.rate_value)
@@ -79,17 +80,23 @@ class Tracker:
 
         else:
             tracks = self.pedestrian.static_tracker(self.cloud_points, self.time_out)
-            # quat = self.odom.pose.orientation
-            # pose = R.from_quat([quat.x, quat.y, quat.z, quat.w])
-            # tf = np.eye(4)
-            # tf[0:3, 0:3] = pose.as_matrix()
-            # tf[:3, 3] = np.array([self.odom.pose.position.x, self.odom.pose.position.y, 0]).T
-            # self.tf = tf
-            # tracks = self.pedestrian.dynamic_tracker(cloud_points, time_out, self.tf)
-            # print(tracks)
+            quat = self.odom.pose.orientation
+            pose = R.from_quat([quat.x, quat.y, quat.z, quat.w])
+            tf = np.eye(4)
+            tf[0:3, 0:3] = pose.as_matrix()
+            tf[:3, 3] = np.array([self.odom.pose.position.x, self.odom.pose.position.y, 0]).T
+            self.tf = tf
+            # tracks = self.pedestrian.dynamic_tracker(self.cloud_points, self.time_out, self.tf)
+            print(tracks)
             for agent_id in range(min(self.agents, tracks.shape[0])):
                 # point( x coord, y coord, agent id no.)
-                point = Point(tracks[agent_id, 0], tracks[agent_id, 1], agent_id)
+                # point = Point(tracks[agent_id, 1], -tracks[agent_id, 0], agent_id)
+                point_mat = np.eye(4)
+                point_mat[:3, 3] = np.array([tracks[agent_id, 1], -tracks[agent_id, 0], 0]).T
+                transformed_pts = self.tf @ point_mat
+                # transformed_pts[0, 3] += self.odom.pose.position.y
+                # transformed_pts[1, 3] += self.odom.pose.position.x
+                point = Point(transformed_pts[0, 3], transformed_pts[1, 3], agent_id)
                 self.publisher.publish(point)
                 time.sleep(0.05)
 
@@ -108,4 +115,3 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
         tracker.publish_tracked_pts()
         rate.sleep()
-
