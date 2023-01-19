@@ -59,7 +59,7 @@ class Navigator:
         self.husky_odom = []
         self.odom_topic = odom_topic
         self.plotter = Plotter()
-        self.goal = None
+        self.goal = Point(0, 0, 0)
         self.goal_status = False
         self.callback_status = False
         self.odom = None
@@ -91,7 +91,7 @@ class Navigator:
         self.rate = rospy.Rate(self.rate_value)
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
         self.ped_sub = rospy.Subscriber('/tracked/pedestrians', Point, self.callback)
-        # self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
+        self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
         # self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
         self.publisher: rospy.Publisher = rospy.Publisher('/relay', Twist, queue_size=1, latch=True)
 
@@ -211,10 +211,13 @@ class Navigator:
         self.goal_status = True
 
     def seek_live_goal(self, agent_id=0, x=40, y=10, title='live_exp'):
-        self.goal = Point(x - self.obs_traj[-1, 0, 0].item() , y - self.obs_traj[-1, 0, 1].item(), 0)
+        # self.goal = Point(x - self.obs_traj[-1, 0, 0].item() , y - self.obs_traj[-1, 0, 1].item(), 0)
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
             obs_traj_rel = abs_to_relative(self.obs_traj)
+            obs_traj_rel[::, 1] = 0
+            self.obs_traj[::, 1] = 0
+            # obs_traj_rel = torch.ones((self.obs_len, 1, 2), device=_DEVICE_) * 0.8
             seq_start_end = torch.tensor([0, self.obs_traj.shape[1]], device=_DEVICE_).unsqueeze(0)
             # seq_start_end = torch.tensor([0, 1], device=_DEVICE_).unsqueeze(0)
             with np.printoptions(precision=3, suppress=True):
@@ -222,9 +225,9 @@ class Navigator:
                 # goal_state[0, agent_id] = pred_traj_gt[-1, agent_id]
                 # goal_state[0, agent_id, 0] = x
 
-                goal_state[0, agent_id, 0] = self.goal.x
+                goal_state[0, agent_id, 0] = self.goal.x - self.obs_traj[-1, 0, 0].item()
                 # goal_state[0, agent_id, 1] = y
-                goal_state[0, agent_id, 1] = self.goal.y
+                goal_state[0, agent_id, 1] = self.goal.y - self.obs_traj[-1, 0, 1].item()
                 # print(f'X {self.goal.x:.2f}, Y {self.goal.y:.2f}')
                 # print(goal_state.shape)
             # ota = self.obs_traj.numpy()
@@ -235,7 +238,11 @@ class Navigator:
             #     print(self.obs_traj[::, 0:2, 0].T)
             #     print(self.obs_traj[::, 0:2, 1].T)
                 # print(self.obs_traj[, 1].T)
-            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
+            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.0)
+            with np.printoptions(precision=2, suppress=True):
+                print(f'Rel Pred Ped 0:\n{pred_traj_fake_rel[::, 1].T}')
+                print(f'Abs Observed Ped 0:\n{self.obs_traj[::, 1].T}')
+                print(f'Rel Observed Ped 0:\n{obs_traj_rel[::, 1].T}')
             start_pos = self.obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
             # print(ptfa[::,0].T)

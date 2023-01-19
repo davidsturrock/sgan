@@ -71,7 +71,7 @@ def main(args):
         accum_time += time.perf_counter() - start
 
         if count == 5:
-            print(f"5 Loop Avg. Loop rate {1 / (accum_time/count):.2f}Hz")
+            # print(f"5 Loop Avg. Loop rate {1 / (accum_time/count):.2f}Hz")
             count = 0
             accum_time = 0
         count += 1
