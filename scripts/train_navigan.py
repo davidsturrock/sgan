@@ -140,7 +140,6 @@ def main(args):
         'There are {} iterations per epoch'.format(iterations_per_epoch)
     )
     # Maybe restore from checkpoint
-    # restore_path = '/home/david/code/sgan/models/sgan-p-models/eth_8_model.pt'
     restore_path = None
     if args.checkpoint_start_from is not None:
         restore_path = args.checkpoint_start_from
@@ -335,10 +334,8 @@ def main(args):
                 checkpoint['g_optim_state'] = optimizer_g.state_dict()
                 checkpoint['d_state'] = discriminator.state_dict()
                 checkpoint['d_optim_state'] = optimizer_d.state_dict()
-                checkpoint_path = os.path.join(
-                    args.output_dir, '%s_with_model.pt' % args.checkpoint_name
-                )
-                logger.info('Saving checkpoint to {}'.format(checkpoint_path))
+                checkpoint_path = os.path.join(args.output_dir, f'{args.checkpoint_name}.pt')
+                logger.info(f'Saving checkpoint to {checkpoint_path}')
                 torch.save(checkpoint, checkpoint_path)
                 logger.info('Done.')
 
