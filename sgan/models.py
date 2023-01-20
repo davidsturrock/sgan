@@ -728,6 +728,8 @@ class CombinedGenerator(nn.Module):
             return pred_traj_rel, goal_traj
         # For now take average of the social and goal generators outputs as the final traj
         for i, goal_idx in enumerate(goal_agent_indices):
-            pred_traj_rel[::, i] = ((1 - goal_aggro) * pred_traj_rel[::, goal_idx] + goal_aggro * goal_traj[::, i]) / 2
-
+            # print(i)
+            # print(goal_idx)
+            pred_traj_rel[::, goal_idx] = ((1 - goal_aggro) * pred_traj_rel[::, goal_idx] + goal_aggro * goal_traj[::, i])
+        # print('*'*60)
         return pred_traj_rel
