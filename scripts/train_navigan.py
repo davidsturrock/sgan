@@ -252,7 +252,7 @@ def main(args):
             # discriminator followed by args.g_steps steps on the generator.
             if d_steps_left > 0:
                 step_type = 'd'
-                losses_d = discriminator_step(args, batch, train_path, generator,discriminator, d_loss_fn, optimizer_d)
+                losses_d = discriminator_step(args, batch, train_path, generator, discriminator, d_loss_fn, optimizer_d)
                 checkpoint['norm_d'].append(
                     get_total_norm(discriminator.parameters()))
                 d_steps_left -= 1
@@ -304,7 +304,7 @@ def main(args):
                 metrics_val = check_accuracy(args, val_loader, val_path, generator, discriminator, d_loss_fn)
                 logger.info('Checking stats on train ...')
                 metrics_train = check_accuracy(args, train_loader, train_path, generator,
-                                               discriminator,d_loss_fn, limit=True)
+                                               discriminator, d_loss_fn, limit=True)
 
                 for k, v in sorted(metrics_val.items()):
                     logger.info('  [val] {}: {:.3f}'.format(k, v))
@@ -377,7 +377,8 @@ def discriminator_step(args, batch, dset_path, generator, discriminator, d_loss_
     loss = torch.zeros(1).to(pred_traj_gt)
     # Using final predicted ground truth point as goal point during training.
     goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
-                                   goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]])
+                                   goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
+                                   pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
     generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
 
     pred_traj_fake_rel = generator_out
@@ -424,7 +425,8 @@ def generator_step(args, batch, dset_path, generator, discriminator, g_loss_fn, 
         # generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
         # Using 3*pred_len as goal pt during training
         goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
-                                       goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]])
+                                       goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
+                                       pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
         generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
 
         pred_traj_fake_rel = generator_out
@@ -490,12 +492,11 @@ def check_accuracy(args, loader, dset_path, generator, discriminator, d_loss_fn,
             # Using 3*pred_len as goal pt during training
             goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
                                            goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
-                                           pred_traj_gt=pred_traj_gt[::,[index[0] for index in seq_start_end]])
+                                           pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
             pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
             # Using final predicted ground truth point as goal point during training.
             # pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
             pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
-
 
             g_l2_loss_abs, g_l2_loss_rel = cal_l2_losses(
                 pred_traj_gt, pred_traj_gt_rel, pred_traj_fake,
