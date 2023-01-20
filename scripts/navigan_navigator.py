@@ -6,7 +6,7 @@ from aru_sil_py.utilities.VisualOdometry import generate_transform_path
 
 from scripts.model_loaders import get_combined_generator
 from scripts.run_navigan import _DEVICE_
-from sgan.utils import relative_to_abs, save_plot_trajectory, abs_to_relative
+from sgan.utils import relative_to_abs, save_trajectory_plot, abs_to_relative
 
 # sys.path.insert(0, '/home/administrator/code/aru-core/build/lib')
 # sys.path.insert(0, '/home/administrator/code/aru_sil_py')
@@ -141,7 +141,7 @@ class Navigator:
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
 
-            save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+            save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
         # for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:
         #         print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')

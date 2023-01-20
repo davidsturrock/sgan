@@ -8,7 +8,7 @@ from attrdict import AttrDict
 from sgan.data.loader import data_loader
 from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator, IntentionForceGenerator
 from sgan.losses import displacement_error, final_displacement_error
-from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories, plot_losses, save_plot_trajectory
+from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories, plot_losses, save_trajectory_plot
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
@@ -213,7 +213,7 @@ def goal_experiment(batch_no, first, generator, goal_state, i, obs_traj, obs_tra
         # title = f'x_{goal_state[0, 0, 0]:.2f}_y{goal_state[0, 0, 1]:.2f}'
         title = f'Batch {i} | {j} x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
         # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-        save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+        save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
     for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
         if i == 0:
             print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')
@@ -253,7 +253,7 @@ def seek_goal(loader, generator, iters=8):
                 ptfa = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
                 title = f'Batch {i} iter {j} | x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
                 # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-                save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+                save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
 
                 # Shift the obs traj along by one timestep using the pred_traj_fake_abs (ptfa)
                 # as the next observed point
@@ -310,7 +310,7 @@ def seek_goal_simulated_data(generator, iters=8, x=6, y=-18):
             ptfa = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
             title = f'{dir}/Iter {j} {suffix}'
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-            save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+            save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
 
             # Shift the obs traj along by one timestep using the pred_traj_fake_abs (ptfa)
             # as the next observed point

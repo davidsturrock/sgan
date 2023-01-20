@@ -65,46 +65,51 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
         plt.close(fig)
 
 
-def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
-    for i, (s, e) in enumerate(seq_start_end[::, ::]):
-        # print(f'i {i}, s {s},e {e}')
-        cmap = list(mcolours.TABLEAU_COLORS.keys())
-        if len(cmap) < e - s:
-            cmap = list(mcolours.CSS4_COLORS.keys())
-        fig, ax = plt.subplots()
+def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
+                          plot_title='trajectory plot',
+                         save_name='trajectory_plot',
+                         save_directory='/home/david/Pictures/plots/sgan/navigan3pred/dataset_tests', **kwargs):
+    cmap = list(mcolours.TABLEAU_COLORS.keys())
+    if len(cmap) < obs_traj_abs.shape[1]:
+        cmap = list(mcolours.CSS4_COLORS.keys())
+    fig, ax = plt.subplots()
 
+    for j in range(obs_traj_abs.shape[1]):
+        if j == 0:
 
-        for j in range(s, e):
+            ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c='black', linestyle='', marker='.')
+            ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c='black', linestyle='', marker='x')
+            ax.plot(pred_traj_abs[::, j, 0], pred_traj_abs[::, j, 1], markersize=3, c='black', linestyle='', marker='*')
+        else:
             colour = cmap.pop(0)
-            l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
-                         linestyle='', marker='.')
-            # l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
-            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], markersize=3, c=colour, linestyle='',
-                         marker='*')
+            ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour, linestyle='', marker='.')
+            ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
+            ax.plot(pred_traj_abs[::, j, 0], pred_traj_abs[::, j, 1], markersize=3, c=colour, linestyle='', marker='*')
 
-        # plt.title(f'Goal Pt {title.split("/")[1]}')
-        plt.title(f'Goal Pt {title}')
-        plt.axis('square')
-        ax.set_xlabel('X [m]')
-        ax.set_ylabel('Y [m]')
-        plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
-                                 markersize=5, label='Obs_traj')
-        # x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
-        #                        markersize=5, label='Pred_traj_gt')
-        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
-                                  markersize=5, label='Pred_traj_fake')
-        # ax.legend(handles=[dot_line, x_line, star_line])
-        # ax.legend(handles=[dot_line, star_line])
-        xlim = [-5,15]
-        ax.set_xlim(xlim)
-        ylim = [-10,10]
-        ax.set_ylim(ylim)
-        save_file = pathlib.Path('/home/david/Pictures/plots/sgan/navigan3pred') / f'{title}_seq_{i}.png'
-        save_file.parent.mkdir(exist_ok=True, parents=True)
+    plt.title(f'{plot_title}')
+    plt.axis('square')
+    ax.set_xlabel('X [m]')
+    ax.set_ylabel('Y [m]')
+    plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+    dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
+                             markersize=5, label='Observed')
+    x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
+                           markersize=5, label='Ground Truth')
+    star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
+                              markersize=5, label='Predicted')
+    # ax.legend(handles=[dot_line, x_line, star_line])
+    # ax.legend(handles=[dot_line, star_line])
+    ax.legend(bbox_to_anchor=(1.37, 0.92), loc='center right', handles=[dot_line, x_line, star_line])
+    xlim = kwargs.get('xlim', [-5, 15])
+    ylim = kwargs.get('ylim', [-10, 10])
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
 
-        plt.savefig(save_file)
-        plt.close(fig)
+    save_directory = pathlib.Path(save_directory)
+    save_name = save_directory / f'{save_name}.png'
+    save_name.parent.mkdir(exist_ok=True, parents=True)
+    plt.savefig(save_name)
+    plt.close(fig)
 
 
 def int_tuple(s):
@@ -207,7 +212,7 @@ def abs_to_relative(abs_traj):
     # return torch.diff(abs_traj, dim=0)
 
 
-def plot_losses(checkpoint, train:bool=True):
+def plot_losses(checkpoint, train: bool = True):
     key = 'train' if train else 'val'
     # g_losses = checkpoint['G_losses']['G_total_loss']
     g_losses = checkpoint[f'metrics_{key}']['g_l2_loss_rel']
@@ -235,6 +240,7 @@ def plot_losses(checkpoint, train:bool=True):
     plt.show()
     plt.close(fig)
 
+
 def write_plots_to_video():
     import cv2
     import glob
@@ -255,4 +261,3 @@ def write_plots_to_video():
 
     cv2.destroyAllWindows()
     video.release()
-
