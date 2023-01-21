@@ -66,13 +66,20 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
 
 
 def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
-                          plot_title='trajectory plot',
-                         save_name='trajectory_plot',
+                         goal=None,  arrival_tol=0.5, collision_point=None, col_tol= 0.2,
+                         plot_title='trajectory plot', save_name='trajectory_plot',
                          save_directory='/home/david/Pictures/plots/sgan/navigan3pred/dataset_tests', **kwargs):
+    if goal is None:
+        goal = []
+    if collision_point is None:
+        collision_point = []
+
     cmap = list(mcolours.TABLEAU_COLORS.keys())
     if len(cmap) < obs_traj_abs.shape[1]:
         cmap = list(mcolours.CSS4_COLORS.keys())
+
     fig, ax = plt.subplots()
+
 
     for j in range(obs_traj_abs.shape[1]):
         if j == 0:
@@ -85,6 +92,15 @@ def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
             ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour, linestyle='', marker='.')
             ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
             ax.plot(pred_traj_abs[::, j, 0], pred_traj_abs[::, j, 1], markersize=3, c=colour, linestyle='', marker='*')
+
+    # Add goal arrival and collision circles
+    if len(goal):
+        circle = plt.Circle(goal, arrival_tol, color='r', fill=False)
+        ax.add_patch(circle)
+
+    if len(collision_point):
+        collision_circle = plt.Circle(collision_point, col_tol, color='g', fill=False)
+        ax.add_patch(collision_circle)
 
     plt.title(f'{plot_title}')
     plt.axis('square')
@@ -110,6 +126,10 @@ def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
     save_name.parent.mkdir(exist_ok=True, parents=True)
     plt.savefig(save_name)
     plt.close(fig)
+    # sys.exit(0)
+
+
+
 
 
 def int_tuple(s):
@@ -228,14 +248,14 @@ def plot_losses(checkpoint, train: bool = True):
     l2 = ax[0, 1].plot(d_losses, 'r', linestyle='-', marker='.', markersize=0.1, label='Discriminator Losses')
     l3 = ax[1, 0].plot(fde, 'b', linestyle='-', marker='.', markersize=0.1, label=f'{key} FDE')
     l4 = ax[1, 1].plot(ade, 'c', linestyle='-', marker='.', markersize=0.1, label=f'{key} ADE')
-    # plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-    plt.title('Metrics Graph')
-    # plt.axis('square')
+
+    plt.suptitle(f"Network Trained for {checkpoint['counters']['epoch']} epochs.")
+    fig.tight_layout(rect=[0, 0.03, 1, 0.9], pad=2)
     for a in ax.flat:
-        a.set_xlabel('Epoch')
+        a.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+        a.set_xlabel('Epochs')
         a.set_ylabel('Loss')
         a.legend()
-    # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
     plt.show()
     plt.close(fig)

@@ -78,21 +78,20 @@ def main(args):
     for path in paths:
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         generator = get_combined_generator(checkpoint)
-
         _args = AttrDict(checkpoint['args'])
-        # _args.batch_size = 1
         dpath = get_dset_path(_args.dataset_name, args.dset_type)
         dset, loader = data_loader(_args, dpath)
 
         # plot_losses(checkpoint, train=True)
-        # sys.exit(0)
+        # plot_losses(checkpoint, train=False)
+
         # ade, fde = evaluate(_args, loader, dset, generator, args.num_samples, dpath)
         # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
-
         # count_suitable_target_agents_in_dataset(dpath, loader, generator)
         # print(f'No. of seqs: {len(dset)}')
-        evaluate_model_trajectories(dpath, loader, generator, model_name=f'{os.path.basename(path)}', iters=12)
+        suc, fail, sbreach = evaluate_model_trajectories(dpath, loader, generator, model_name=f'{os.path.basename(path)}', iters=24)
+        print(f'No. of seqs: {len(dset)} Successes: {suc} Fails: {fail} Social Breaches: {sbreach}')
         # seek_goal_simulated_data(generator, x=11, y=10, arrival_tol=2.2)
 
 
