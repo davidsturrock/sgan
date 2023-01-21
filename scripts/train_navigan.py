@@ -148,10 +148,7 @@ def main(args):
 
     if restore_path is not None and os.path.isfile(restore_path):
         logger.info('Restoring from checkpoint {}'.format(restore_path))
-        print(f'torch.cuda.device_count(): {torch.cuda.device_count()}')
-        print(f'_DEVICE_: {_DEVICE_}')
-        sys.exit(0)
-        checkpoint = torch.load(restore_path, map_location=_DEVICE_)
+        checkpoint = torch.load(restore_path, map_location=f'{_DEVICE_}:{torch.cuda.current_device()}')
         generator = get_generator(checkpoint)
         dicriminator = get_discriminator(checkpoint)
 
