@@ -17,6 +17,7 @@ from pathlib import Path
 
 from evaluate_model import get_generator, get_discriminator
 from scripts.goal import create_goal_state
+from scripts.model_loaders import get_combined_generator
 from sgan.data.loader import data_loader
 from sgan.losses import gan_g_loss, gan_d_loss, l2_loss
 from sgan.losses import displacement_error, final_displacement_error
@@ -148,8 +149,8 @@ def main(args):
 
     if restore_path is not None and os.path.isfile(restore_path):
         logger.info('Restoring from checkpoint {}'.format(restore_path))
-        checkpoint = torch.load(restore_path, map_location=f'{_DEVICE_}:{torch.cuda.current_device()}')
-        generator = get_generator(checkpoint)
+        checkpoint = torch.load(restore_path, map_location=f'cpu')
+        generator = get_combined_generator(checkpoint)
         dicriminator = get_discriminator(checkpoint)
 
         t = checkpoint['counters']['t']
