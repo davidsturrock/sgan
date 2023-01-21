@@ -137,9 +137,7 @@ def main(args):
     if args.num_epochs:
         args.num_iterations = int(iterations_per_epoch * args.num_epochs)
 
-    logger.info(
-        'There are {} iterations per epoch'.format(iterations_per_epoch)
-    )
+    logger.info(f'There are {iterations_per_epoch:.0f} iterations per epoch')
     # Maybe restore from checkpoint
     restore_path = None
     if args.checkpoint_start_from is not None:
@@ -148,10 +146,10 @@ def main(args):
         restore_path = os.path.join(args.output_dir, f'{args.checkpoint_name}.pt')
 
     if restore_path is not None and os.path.isfile(restore_path):
-        logger.info('Restoring from checkpoint {}'.format(restore_path))
+        logger.info(f'Restoring from checkpoint {restore_path}')
         checkpoint = torch.load(restore_path, map_location=f'cpu')
         generator = get_combined_generator(checkpoint)
-        dicriminator = get_discriminator(checkpoint)
+        discriminator = get_discriminator(checkpoint)
 
         t = checkpoint['counters']['t']
         epoch = checkpoint['counters']['epoch']
@@ -241,7 +239,7 @@ def main(args):
         d_steps_left = args.d_steps
         g_steps_left = args.g_steps
         epoch += 1
-        logger.info('Starting epoch {}'.format(epoch))
+        logger.info(f'Starting epoch {epoch}')
         for batch in train_loader:
             # batch = batch.to(_DEVICE_)
             if args.timing == 1:
@@ -270,7 +268,7 @@ def main(args):
             if args.timing == 1:
                 torch.cuda.synchronize()
                 t2 = time.time()
-                logger.info('{} step took {}'.format(step_type, t2 - t1))
+                logger.info(f'{step_type} step took {t2 - t1:.3f}s')
 
             # Skip the rest if we are not at the end of an iteration
             if d_steps_left > 0 or g_steps_left > 0:
@@ -278,19 +276,17 @@ def main(args):
 
             if args.timing == 1:
                 if t0 is not None:
-                    logger.info('Interation {} took {}'.format(
-                        t - 1, time.time() - t0
-                    ))
+                    logger.info(f'Interation {t - 1} took {time.time() - t0:.2f}s')
                 t0 = time.time()
 
             # Maybe save loss
             if t % args.print_every == 0:
-                logger.info('t = {} / {}'.format(t + 1, args.num_iterations))
+                logger.info(f't = {t + 1} / {args.num_iterations}')
                 for k, v in sorted(losses_d.items()):
-                    logger.info('  [D] {}: {:.3f}'.format(k, v))
+                    logger.info(f'  [D] {k}: {v:.3f}')
                     checkpoint['D_losses'][k].append(v)
                 for k, v in sorted(losses_g.items()):
-                    logger.info('  [G] {}: {:.3f}'.format(k, v))
+                    logger.info(f'  [G] {k}: {v:.3f}')
                     checkpoint['G_losses'][k].append(v)
                 checkpoint['losses_ts'].append(t)
 
@@ -308,10 +304,10 @@ def main(args):
                                                discriminator, d_loss_fn, limit=True)
 
                 for k, v in sorted(metrics_val.items()):
-                    logger.info('  [val] {}: {:.3f}'.format(k, v))
+                    logger.info(f'  [val] {k}: {v:.3f}')
                     checkpoint['metrics_val'][k].append(v)
                 for k, v in sorted(metrics_train.items()):
-                    logger.info('  [train] {}: {:.3f}'.format(k, v))
+                    logger.info(f'  [train] {k}: {v:.3f}')
                     checkpoint['metrics_train'][k].append(v)
 
                 min_ade = min(checkpoint['metrics_val']['ade'])
@@ -354,7 +350,7 @@ def save_shallow(args, checkpoint):
     opy of the checkpoint excluding some items"""
     checkpoint_path = os.path.join(
         args.output_dir, '%s_no_model.pt' % args.checkpoint_name)
-    logger.info('Saving checkpoint to {}'.format(checkpoint_path))
+    logger.info(f'Saving checkpoint to {checkpoint_path}')
     key_blacklist = [
         'g_state', 'd_state', 'g_best_state', 'g_best_nl_state',
         'g_optim_state', 'd_optim_state', 'd_best_state',
