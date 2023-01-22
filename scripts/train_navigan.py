@@ -349,18 +349,14 @@ def main(args):
 def save_shallow(args, checkpoint):
     """" Save a checkpoint with no model weights by making a shallow
     opy of the checkpoint excluding some items"""
-    checkpoint_path = os.path.join(
-        args.output_dir, '%s_no_model.pt' % args.checkpoint_name)
+    checkpoint_path = os.path.join(args.output_dir, f'{args.checkpoint_name}_no_model.pt')
+
     logger.info(f'Saving checkpoint to {checkpoint_path}')
-    key_blacklist = [
-        'g_state', 'd_state', 'g_best_state', 'g_best_nl_state',
-        'g_optim_state', 'd_optim_state', 'd_best_state',
-        'd_best_nl_state'
-    ]
-    small_checkpoint = {}
-    for k, v in checkpoint.items():
-        if k not in key_blacklist:
-            small_checkpoint[k] = v
+    key_blacklist = ['g_state', 'd_state', 'g_best_state', 'g_best_nl_state', 'g_optim_state', 'd_optim_state',
+                     'd_best_state', 'd_best_nl_state']
+
+    small_checkpoint = {k: v for k, v in checkpoint.items() if k not in key_blacklist}
+
     torch.save(small_checkpoint, checkpoint_path)
     logger.info('Done.')
 
@@ -371,7 +367,6 @@ def discriminator_step(args, batch, dset_path, generator, discriminator, d_loss_
 
     (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped,
      loss_mask, seq_start_end) = batch
-    losses = {}
     loss = torch.zeros(1).to(pred_traj_gt)
     # Using final predicted ground truth point as goal point during training.
     goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
@@ -382,18 +377,9 @@ def discriminator_step(args, batch, dset_path, generator, discriminator, d_loss_
     pred_traj_fake_rel = generator_out
     pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
 
-    traj_real = torch.cat([obs_traj, pred_traj_gt], dim=0)
-    traj_real_rel = torch.cat([obs_traj_rel, pred_traj_gt_rel], dim=0)
-    traj_fake = torch.cat([obs_traj, pred_traj_fake], dim=0)
-    traj_fake_rel = torch.cat([obs_traj_rel, pred_traj_fake_rel], dim=0)
-    # print(f'traj_fake shape: {traj_fake.size()}')
-    # print(f'traj_fake_rel shape: {traj_fake_rel.size()}')
-    scores_fake = discriminator(traj_fake, traj_fake_rel, seq_start_end)
-    scores_real = discriminator(traj_real, traj_real_rel, seq_start_end)
-
-    # Compute loss with optional gradient penalty
-    data_loss = d_loss_fn(scores_real, scores_fake)
-    losses['D_data_loss'] = data_loss.item()
+    data_loss = get_discrim_data_loss(d_loss_fn, discriminator, obs_traj, obs_traj_rel, pred_traj_fake,
+                                   pred_traj_fake_rel, pred_traj_gt, pred_traj_gt_rel, seq_start_end)
+    losses = {'D_data_loss': data_loss.item()}
     loss += data_loss
     losses['D_total_loss'] = loss.item()
     # TODO add l2 loss
@@ -472,10 +458,9 @@ def generator_step(args, batch, dset_path, generator, discriminator, g_loss_fn, 
 
 def check_accuracy(args, loader, dset_path, generator, discriminator, d_loss_fn, limit=False):
     d_losses = []
-    metrics = {}
-    g_l2_losses_abs, g_l2_losses_rel = ([],) * 2
-    disp_error, disp_error_l, disp_error_nl = ([],) * 3
-    f_disp_error, f_disp_error_l, f_disp_error_nl = ([],) * 3
+    g_l2_losses_abs, g_l2_losses_rel = ([], ) * 2
+    disp_error, disp_error_l, disp_error_nl = ([], ) * 3
+    f_disp_error, f_disp_error_l, f_disp_error_nl = ([], ) * 3
     total_traj, total_traj_l, total_traj_nl = 0, 0, 0
     loss_mask_sum = 0
     generator.eval()
@@ -483,42 +468,24 @@ def check_accuracy(args, loader, dset_path, generator, discriminator, d_loss_fn,
         for batch in loader:
             if torch.cuda.is_available():
                 batch = [tensor.cuda(device=_DEVICE_) for tensor in batch]
-            (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
-             non_linear_ped, loss_mask, seq_start_end) = batch
+            obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped, loss_mask, seq_start_end = batch
+
             linear_ped = 1 - non_linear_ped
             loss_mask = loss_mask[:, args.obs_len:]
-            # Using 3*pred_len as goal pt during training
-            goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
-                                           goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
-                                           pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
+            goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len, goal_obs_traj=obs_traj[:, [index[0] for index in seq_start_end]], pred_traj_gt=pred_traj_gt[:, [index[0] for index in seq_start_end]])
+
             pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=args.goal_aggro)
-            # Using final predicted ground truth point as goal point during training.
-            # pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
+
             pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
+            g_l2_loss_abs, g_l2_loss_rel = cal_l2_losses(pred_traj_gt, pred_traj_gt_rel, pred_traj_fake, pred_traj_fake_rel, loss_mask)
 
-            g_l2_loss_abs, g_l2_loss_rel = cal_l2_losses(
-                pred_traj_gt, pred_traj_gt_rel, pred_traj_fake,
-                pred_traj_fake_rel, loss_mask
-            )
-            ade, ade_l, ade_nl = cal_ade(
-                pred_traj_gt, pred_traj_fake, linear_ped, non_linear_ped
-            )
+            ade, ade_l, ade_nl = cal_ade(pred_traj_gt, pred_traj_fake, linear_ped, non_linear_ped)
 
-            fde, fde_l, fde_nl = cal_fde(
-                pred_traj_gt, pred_traj_fake, linear_ped, non_linear_ped
-            )
+            fde, fde_l, fde_nl = cal_fde(pred_traj_gt, pred_traj_fake, linear_ped, non_linear_ped)
 
-            traj_real = torch.cat([obs_traj, pred_traj_gt], dim=0)
-            traj_real_rel = torch.cat([obs_traj_rel, pred_traj_gt_rel], dim=0)
-            traj_fake = torch.cat([obs_traj, pred_traj_fake], dim=0)
-            traj_fake_rel = torch.cat([obs_traj_rel, pred_traj_fake_rel], dim=0)
+            d_loss = get_discrim_data_loss(d_loss_fn, discriminator, obs_traj, obs_traj_rel, pred_traj_fake, pred_traj_fake_rel, pred_traj_gt, pred_traj_gt_rel, seq_start_end)
 
-            scores_fake = discriminator(traj_fake, traj_fake_rel, seq_start_end)
-            scores_real = discriminator(traj_real, traj_real_rel, seq_start_end)
-
-            d_loss = d_loss_fn(scores_real, scores_fake)
             d_losses.append(d_loss.item())
-
             g_l2_losses_abs.append(g_l2_loss_abs.item())
             g_l2_losses_rel.append(g_l2_loss_rel.item())
             disp_error.append(ade.item())
@@ -527,20 +494,14 @@ def check_accuracy(args, loader, dset_path, generator, discriminator, d_loss_fn,
             f_disp_error.append(fde.item())
             f_disp_error_l.append(fde_l.item())
             f_disp_error_nl.append(fde_nl.item())
-
             loss_mask_sum += torch.numel(loss_mask.data)
             total_traj += pred_traj_gt.size(1)
             total_traj_l += torch.sum(linear_ped).item()
             total_traj_nl += torch.sum(non_linear_ped).item()
             if limit and total_traj >= args.num_samples_check:
                 break
+    metrics = {'d_loss': sum(d_losses) / len(d_losses), 'g_l2_loss_abs': sum(g_l2_losses_abs) / loss_mask_sum, 'g_l2_loss_rel': sum(g_l2_losses_rel) / loss_mask_sum, 'ade': sum(disp_error) / (total_traj * args.pred_len), 'fde': sum(f_disp_error) / total_traj}
 
-    metrics['d_loss'] = sum(d_losses) / len(d_losses)
-    metrics['g_l2_loss_abs'] = sum(g_l2_losses_abs) / loss_mask_sum
-    metrics['g_l2_loss_rel'] = sum(g_l2_losses_rel) / loss_mask_sum
-
-    metrics['ade'] = sum(disp_error) / (total_traj * args.pred_len)
-    metrics['fde'] = sum(f_disp_error) / total_traj
     if total_traj_l != 0:
         metrics['ade_l'] = sum(disp_error_l) / (total_traj_l * args.pred_len)
         metrics['fde_l'] = sum(f_disp_error_l) / total_traj_l
@@ -548,15 +509,23 @@ def check_accuracy(args, loader, dset_path, generator, discriminator, d_loss_fn,
         metrics['ade_l'] = 0
         metrics['fde_l'] = 0
     if total_traj_nl != 0:
-        metrics['ade_nl'] = sum(disp_error_nl) / (
-                total_traj_nl * args.pred_len)
+        metrics['ade_nl'] = sum(disp_error_nl) / (total_traj_nl * args.pred_len)
         metrics['fde_nl'] = sum(f_disp_error_nl) / total_traj_nl
     else:
         metrics['ade_nl'] = 0
         metrics['fde_nl'] = 0
-
     generator.train()
     return metrics
+
+
+def get_discrim_data_loss(d_loss_fn, discriminator, obs_traj, obs_traj_rel, pred_traj_fake, pred_traj_fake_rel, pred_traj_gt, pred_traj_gt_rel, seq_start_end):
+    traj_real = torch.cat([obs_traj, pred_traj_gt], dim=0)
+    traj_real_rel = torch.cat([obs_traj_rel, pred_traj_gt_rel], dim=0)
+    traj_fake = torch.cat([obs_traj, pred_traj_fake], dim=0)
+    traj_fake_rel = torch.cat([obs_traj_rel, pred_traj_fake_rel], dim=0)
+    scores_fake = discriminator(traj_fake, traj_fake_rel, seq_start_end)
+    scores_real = discriminator(traj_real, traj_real_rel, seq_start_end)
+    return d_loss_fn(scores_real, scores_fake)
 
 
 def cal_l2_losses(

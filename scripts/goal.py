@@ -100,15 +100,15 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     ptitle = f'Goal Batch {i}  Seq {k} Iter {j} ' \
                              f'Goal {goal_state[0, k, 0].item():.2f}m {goal_state[0, k, 1].item():.2f}m'
 
-                    pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
+                    pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=1)
                     ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=obs_traj[-1])
 
                     # social compliance check
                     coll_pt = social_compliance_check(obs_traj[-1, s:e], tolerance=coltol)
-                    save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
-                                         goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt, col_tol=coltol,
-                                         plot_title=ptitle, save_name=title, save_directory=save_directory,
-                                         xlim=[-2.5, 15], ylim=[0, 10])
+                    # save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
+                    #                      goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt, col_tol=coltol,
+                    #                      plot_title=ptitle, save_name=title, save_directory=save_directory,
+                    #                      xlim=[-2.5, 15], ylim=[0, 10])
                     if goal_arrival_check(observed_point=obs_traj[-1, s], goal=goal_state[0, k], tolerance=atol):
                         successes += 1
                         print('Goal Reached.')
@@ -128,7 +128,8 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     if j == iters - 1:
                         print('Goal not reached in time.')
                         fails += 1
-            return successes, fails, social_breach
+
+        return successes, fails, social_breach, (i + 1) * 32
 
 
 def social_compliance_check(obs_traj_abs, tolerance=0.2):
@@ -207,7 +208,6 @@ def seek_live_goal(obs_traj, generator, x, y, agent_id=0, title='live_exp'):
 
 def pts_to_tfs(pred_traj_fake_rel):
     tfs = []
-    # ptfr = pred_traj_fake_rel.numpy()[1:]
     ptfr = pred_traj_fake_rel.numpy()[1:]
     turn_angle = 0
     old_turn_angle = 0
@@ -353,44 +353,30 @@ def get_match_idx(data, last_obs):
     return np.intersect1d(x_idxs, y_idxs)
 
 
-def goal_point_exists(data, generator, last_obs):
+def goal_point_exists(data, generator, last_obs) -> bool:
     x, y = (t.item() for t in last_obs)
-    xmask = np.isclose(data[::, 2], x, atol=0.005)
-    ymask = np.isclose(data[::, 3], y, atol=0.005)
-    x_idxs = np.argwhere((xmask))
-    y_idxs = np.argwhere((ymask))
+    xmask = np.isclose(data[:, 2], x, atol=0.005)
+    ymask = np.isclose(data[:, 3], y, atol=0.005)
+    x_idxs = np.argwhere(xmask)
+    y_idxs = np.argwhere(ymask)
     match_idx = np.intersect1d(x_idxs, y_idxs)
     if len(match_idx) > 1:
         match_idx = get_closest_match(data, last_obs, match_idx)
     else:
         match_idx = match_idx[0]
-
     agent_id = data[match_idx, 1]
-
-    subset = data[match_idx::]
-    frames_w_agent = np.argwhere(subset[::, 1] == agent_id)
+    subset = data[match_idx:]
+    frames_w_agent = np.argwhere(subset[:, 1] == agent_id)
     agent_final_frame = subset[frames_w_agent][-1]
     goal_idx = int(np.argwhere(np.all(data == agent_final_frame, axis=1)))
-
-    # If the goal index is within dataset size and the agent id of the goal
-    # line matches the matching line
-    if subset[frames_w_agent].shape[0] - 1 > 3 * generator.goal.pred_len:
-        # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames.')
-        # print(f'Matching line: {data[match_idx]}')
-        # print(f'3*pred_len line: {data[goal_idx]}')
-        return True
-    else:
-        return False
+    return subset[frames_w_agent].shape[0] - 1 > 3 * generator.goal.pred_len
 
 
 def get_closest_match(data, last_obs, match_idx):
     """Returns the closest matching line in array according to smallest l1 distance between x and y pairs"""
     last_obs = last_obs.cpu().numpy()
-    # print(f'x {x:.4f} y {y:.4f} matching lines: {match_idx}')
-    # print(data[match_idx])
-    diff_dict = {}
-    diff_dict[np.linalg.norm(data[match_idx[0]][2:] - last_obs)] = match_idx[0]
-    diff_dict[np.linalg.norm(data[match_idx[1]][2:] - last_obs)] = match_idx[1]
+    diff_dict = {np.linalg.norm(data[match_idx[0]][2:] - last_obs): match_idx[0],
+                 np.linalg.norm(data[match_idx[1]][2:] - last_obs): match_idx[1]}
     min_key = min(diff_dict.keys())
     return diff_dict[min_key]
 

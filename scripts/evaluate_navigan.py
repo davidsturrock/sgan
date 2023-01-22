@@ -89,9 +89,8 @@ def main(args):
         # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
         # count_suitable_target_agents_in_dataset(dpath, loader, generator)
-        # print(f'No. of seqs: {len(dset)}')
-        suc, fail, sbreach = evaluate_model_trajectories(dpath, loader, generator, model_name=f'{os.path.basename(path)}', iters=24)
-        print(f'No. of seqs: {len(dset)} Successes: {suc} Fails: {fail} Social Breaches: {sbreach}')
+        suc, fail, sbreach, seqs = evaluate_model_trajectories(dpath, loader, generator, model_name=f'{os.path.basename(path)}', iters=36)
+        print(f'No. of seqs: {seqs} Successes: {suc} Fails: {fail} Social Breaches: {sbreach}')
         # seek_goal_simulated_data(generator, x=11, y=10, arrival_tol=2.2)
 
 

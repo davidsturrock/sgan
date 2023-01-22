@@ -139,7 +139,7 @@ def int_tuple(s):
 def find_nan(variable, var_name):
     variable_n = variable.data.cpu().numpy()
     if np.isnan(variable_n).any():
-        exit('%s has nan' % var_name)
+        exit(f'{var_name} has nan')
 
 
 def bool_flag(s):
@@ -185,16 +185,12 @@ def timeit(msg, should_time=True):
 
 def get_gpu_memory():
     torch.cuda.synchronize()
-    opts = [
-        'nvidia-smi', '-q', '--gpu=' + str(1), '|', 'grep', '"Used GPU Memory"'
-    ]
+    opts = ['nvidia-smi', '-q', '--gpu=1', '|', 'grep', '"Used GPU Memory"']
     cmd = str.join(' ', opts)
-    ps = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = ps.communicate()[0].decode('utf-8')
     output = output.split("\n")[0].split(":")
-    consumed_mem = int(output[1].strip().split(" ")[0])
-    return consumed_mem
+    return int(output[1].strip().split(" ")[0])
 
 
 def get_dset_path(dset_name, dset_type):
