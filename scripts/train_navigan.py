@@ -52,6 +52,7 @@ parser.add_argument('--num_layers', default=1, type=int)
 parser.add_argument('--dropout', default=0, type=float)
 parser.add_argument('--batch_norm', default=0, type=bool_flag)
 parser.add_argument('--mlp_dim', default=64, type=int)
+parser.add_argument('--goal_aggro', default=0.5, type=float)
 
 # Generator Options
 parser.add_argument('--encoder_h_dim_g', default=32, type=int)
@@ -376,7 +377,7 @@ def discriminator_step(args, batch, dset_path, generator, discriminator, d_loss_
     goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
                                    goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
                                    pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
-    generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
+    generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=args.goal_aggro)
 
     pred_traj_fake_rel = generator_out
     pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
@@ -424,7 +425,7 @@ def generator_step(args, batch, dset_path, generator, discriminator, g_loss_fn, 
         goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
                                        goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
                                        pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
-        generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
+        generator_out = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=args.goal_aggro)
 
         pred_traj_fake_rel = generator_out
         pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
@@ -490,7 +491,7 @@ def check_accuracy(args, loader, dset_path, generator, discriminator, d_loss_fn,
             goal_state = create_goal_state(dpath=dset_path, pred_len=generator.goal.pred_len,
                                            goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
                                            pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
-            pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
+            pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=args.goal_aggro)
             # Using final predicted ground truth point as goal point during training.
             # pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, pred_traj_gt[-1].reshape(1, -1, 2))
             pred_traj_fake = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
