@@ -107,7 +107,7 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
 
 def save_plots_empty_lists(atol, coll_pt, coltol, goal_state, k, obs_list, pred_list, ptitle, save_directory, title):
     for obs, pred in zip(obs_list, pred_list):
-        print(obs, pred)
+        print(obs.shape, pred.shape)
         save_trajectory_plot(obs, [], pred,
                              goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt,
                              col_tol=coltol,
@@ -443,10 +443,10 @@ def create_goal_state(dpath, pred_len, goal_obs_traj, pred_traj_gt=0, relative=T
         # print(f'Goal index {goal_idx} [Line no. {goal_idx+1}]')
 
         # print(f'Obs pt: {last_obs}')
-        cuda0 = torch.device('cuda:0')
-        relative_to = last_obs.clone().to(cuda0)
         if relative:
-            goal_state[0, i] = torch.tensor(data[goal_idx, 2:]) - relative_to
+            # cuda0 = torch.device('cuda:0')
+            # relative_to = last_obs.clone().to(cuda0)
+            goal_state[0, i] = torch.tensor(data[goal_idx, 2:] - last_obs.numpy(), device=goal_state.device())
             # print(f'Rel Goal: {goal_state[0, i]}')
         else:
             goal_state[0, i] = torch.tensor(data[goal_idx, 2:])
