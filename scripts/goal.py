@@ -29,12 +29,12 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                                            pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
 
             for k, (s, e) in enumerate(seq_start_end):
-                save_directory = Path(f'/home/david/Pictures/plots/goal_test/{model_name}/Seq {k}').with_suffix('').__str__()
+                # save_directory = Path(f'/home/david/Pictures/plots/goal_test/{model_name}/Seq {k}').with_suffix('').__str__()
                 # goal_state[0, k, 0] = x
                 # goal_state[0, k, 1] = y
                 # TODO consider how goal state in training changes each time but does not change each iter for eval
-                snames = []
-                figs = []
+                obs_list = []
+                pred_list = []
                 for j in range(iters):
                     # print(goal_state[0 ,s].shape)
                     # print(obs_traj[-1, s].shape)
@@ -46,7 +46,8 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
 
                     pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=goal_aggro)
                     ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=obs_traj[-1])
-
+                    obs_list.append(obs_traj[5:, s:e].clone())
+                    pred_list.append(ptfa[:3, s:e].clone())
                     # social compliance check
                     coll_pt = social_compliance_check(obs_traj[-1, s:e], tolerance=coltol)
                     # if j == 0:
@@ -64,23 +65,28 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     #     y = float(input('Goal y value: '))
                     #     goal_state[0, k, 1] = y
                     # # Save plot
-                    sname, fig = save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
-                                         goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt,
-                                         col_tol=coltol,
-                                         plot_title=ptitle, save_name=title, save_directory=save_directory,
-                                         xlim=[-30, 30], ylim=[-30, 30])
-                    snames.append(sname)
-                    figs.append(fig)
+                    # save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
+                    #                      goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt,
+                    #                      col_tol=coltol,
+                    #                      plot_title=ptitle, save_name=title, save_directory=save_directory,
+                    #                      xlim=[-30, 30], ylim=[-30, 30])
+
                     if goal_arrival_check(observed_point=obs_traj[-1, s], goal=goal_state[0, k], tolerance=atol):
                         successes += 1
                         print('Goal Reached.')
-                        save_figs(snames, figs)
+                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{model_name}/success/Seq {k}')\
+                            .with_suffix('').__str__()
+                        obs_list, pred_list = save_plots_empty_lists(atol, coll_pt, coltol, goal_state, k, obs_list,
+                                                                     pred_list, ptitle, save_directory, title)
                         x, y = None, None
                         break
                     elif coll_pt is not None:
                         social_breach += 1
                         print('Social Breach.')
-                        close_figs(figs)
+                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{model_name}/breach/Seq {k}')\
+                            .with_suffix('').__str__()
+                        obs_list, pred_list = save_plots_empty_lists(atol, coll_pt, coltol, goal_state, k, obs_list,
+                                                                     pred_list, ptitle, save_directory, title)
                         x, y = None, None
                         break
                     obs_traj, obs_traj_rel = update_observations(s, e, j, obs_traj, pred_traj_gt, ptfa)
@@ -88,13 +94,23 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     # update_goalstate(goal_state, iters, j, obs_traj)
                     if j == iters - 1:
                         print('Goal not reached in time.')
-                        close_figs(figs)
+                        obs_list = []
+                        pred_list = []
                         fails += 1
                         x, y = None, None
                 seqs += 1
             if seqs >= 96:
                 return successes, fails, social_breach, seqs
         return successes, fails, social_breach, seqs
+
+
+def save_plots_empty_lists(atol, coll_pt, coltol, goal_state, k, obs_list, pred_list, ptitle, save_directory, title):
+    for obs, pred in zip(obs_list, pred_list):
+        save_trajectory_plot(obs, [], pred,
+                             goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt,
+                             col_tol=coltol,
+                             plot_title=ptitle, save_name=title, save_directory=save_directory)
+        return [], []
 
 
 def update_goalstate(goal_state, iters, j, obs_traj):
@@ -426,7 +442,7 @@ def create_goal_state(dpath, pred_len, goal_obs_traj, pred_traj_gt=0, relative=T
 
         # print(f'Obs pt: {last_obs}')
         if relative:
-            goal_state[0, i] = torch.tensor(data[goal_idx, 2:]) - last_obs
+            goal_state[0, i] = torch.tensor(data[goal_idx, 2:]) - last_obs.to(_DEVICE_)
             # print(f'Rel Goal: {goal_state[0, i]}')
         else:
             goal_state[0, i] = torch.tensor(data[goal_idx, 2:])
