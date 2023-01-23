@@ -8,7 +8,8 @@ from attrdict import AttrDict
 from pathlib import Path
 
 from scripts.evaluate_model import evaluate_helper
-from scripts.goal import evaluate_model_trajectories, count_suitable_target_agents_in_dataset, seek_goal_simulated_data, create_goal_state
+from scripts.goal import evaluate_model_trajectories, count_suitable_target_agents_in_dataset, seek_goal_simulated_data, \
+    create_goal_state
 from scripts.model_loaders import get_combined_generator
 from sgan.data.loader import data_loader
 from sgan.data.trajectories import read_file
@@ -17,7 +18,7 @@ from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories, plot_l
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
-parser.add_argument('--num_samples', default=2, type=int)
+parser.add_argument('--num_samples', default=1, type=int)
 parser.add_argument('--dset_type', default='test', type=str)
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -65,6 +66,11 @@ def evaluate(args, loader, dset, generator, num_samples, dset_path):
         return ade, fde
 
 
+def write(text):
+    with open('/home/david/data/SocialNav/eval_stats.txt', 'a') as f:
+        f.write(text)
+
+
 def main(args):
     if os.path.isdir(args.model_path):
         filenames = os.listdir(args.model_path)
@@ -75,22 +81,28 @@ def main(args):
     else:
         paths = [args.model_path]
 
-    for path in paths:
+    for path, aggro in zip(paths, [1]):
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         generator = get_combined_generator(checkpoint)
         _args = AttrDict(checkpoint['args'])
         dpath = get_dset_path(_args.dataset_name, args.dset_type)
         dset, loader = data_loader(_args, dpath)
-
         # plot_losses(checkpoint, train=True)
         # plot_losses(checkpoint, train=False)
 
-        # ade, fde = evaluate(_args, loader, dset, generator, args.num_samples, dpath)
-        # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
+        ade, fde = evaluate(_args, loader, dset, generator, args.num_samples, dpath)
+        # write(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
         # count_suitable_target_agents_in_dataset(dpath, loader, generator)
-        suc, fail, sbreach, seqs = evaluate_model_trajectories(dpath, loader, generator, model_name=f'{os.path.basename(path)}', iters=36)
-        print(f'No. of seqs: {seqs} Successes: {suc} Fails: {fail} Social Breaches: {sbreach}')
+        goal_aggro = aggro
+        iters = 60
+        suc, fail, sbreach, seqs = evaluate_model_trajectories(dpath, loader, generator,
+                                                               model_name=f'{os.path.basename(path)}', iters=iters,
+                                                               goal_aggro=goal_aggro)
+        print(
+            f'\nModel: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
+            f' Goal Aggro: {goal_aggro} No. of iters {iters} No. of seqs: '
+            f'{seqs} \nSuccesses: {suc} Fails: {fail} Social Breaches: {sbreach}\n\n')
         # seek_goal_simulated_data(generator, x=11, y=10, arrival_tol=2.2)
 
 

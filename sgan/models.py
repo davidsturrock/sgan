@@ -730,6 +730,6 @@ class CombinedGenerator(nn.Module):
         for i, goal_idx in enumerate(goal_agent_indices):
             # print(i)
             # print(goal_idx)
-            pred_traj_rel[::, goal_idx] = ((1 - goal_aggro) * pred_traj_rel[::, goal_idx] + goal_aggro * goal_traj[::, i])
+            pred_traj_rel[::, goal_idx] = (1 - goal_aggro) * pred_traj_rel[::, goal_idx] + goal_aggro * goal_traj[::, i]
         # print('*'*60)
         return pred_traj_rel

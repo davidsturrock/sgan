@@ -66,21 +66,50 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
 
 
 def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
-                         goal=None,  arrival_tol=0.5, collision_point=None, col_tol= 0.2,
+                         goal=None, arrival_tol=0.5, collision_point=None, col_tol=0.2,
                          plot_title='trajectory plot', save_name='trajectory_plot',
                          save_directory='/home/david/Pictures/plots/sgan/navigan3pred/dataset_tests', **kwargs):
+    fig = make_trajectory_plot(arrival_tol, col_tol, collision_point, goal, kwargs, obs_traj_abs, plot_title,
+                               pred_traj_abs, pred_traj_gt_abs)
+    save_directory = pathlib.Path(save_directory)
+    save_name = save_directory / f'{save_name}.png'
+    save_name.parent.mkdir(exist_ok=True, parents=True)
+    # plt.savefig(save_name)
+    # plt.close(fig)
+    return save_name, fig
+
+def save_figs(save_names, figures):
+    matplotlib.rcParams['figure.max_open_warning'] = 60
+    for save_name, figure in zip(save_names, figures):
+        plt.savefig(save_name)
+        plt.close(figure)
+
+def close_figs(figures):
+    for figure in figures:
+        plt.close(figure)
+
+
+def plot_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
+                         goal=None, arrival_tol=0.5, collision_point=None, col_tol=0.2,
+                         plot_title='trajectory plot', save_name='trajectory_plot',
+                         save_directory='/home/david/Pictures/plots/sgan/navigan3pred/dataset_tests', **kwargs):
+    fig = make_trajectory_plot(arrival_tol, col_tol, collision_point, goal, kwargs, obs_traj_abs, plot_title,
+                               pred_traj_abs, pred_traj_gt_abs)
+    plt.show()
+    plt.close(fig)
+    # sys.exit(0)
+
+
+def make_trajectory_plot(arrival_tol, col_tol, collision_point, goal, kwargs, obs_traj_abs, plot_title, pred_traj_abs,
+                         pred_traj_gt_abs):
     if goal is None:
         goal = []
     if collision_point is None:
         collision_point = []
-
     cmap = list(mcolours.TABLEAU_COLORS.keys())
     if len(cmap) < obs_traj_abs.shape[1]:
         cmap = list(mcolours.CSS4_COLORS.keys())
-
     fig, ax = plt.subplots()
-
-
     for j in range(obs_traj_abs.shape[1]):
         if j == 0:
 
@@ -92,16 +121,13 @@ def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
             ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour, linestyle='', marker='.')
             ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
             ax.plot(pred_traj_abs[::, j, 0], pred_traj_abs[::, j, 1], markersize=3, c=colour, linestyle='', marker='*')
-
     # Add goal arrival and collision circles
     if len(goal):
         circle = plt.Circle(goal, arrival_tol, color='r', fill=False)
         ax.add_patch(circle)
-
     if len(collision_point):
         collision_circle = plt.Circle(collision_point, col_tol, color='g', fill=False)
         ax.add_patch(collision_circle)
-
     plt.title(f'{plot_title}')
     plt.axis('square')
     ax.set_xlabel('X [m]')
@@ -120,16 +146,7 @@ def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
     ylim = kwargs.get('ylim', [-10, 10])
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
-
-    save_directory = pathlib.Path(save_directory)
-    save_name = save_directory / f'{save_name}.png'
-    save_name.parent.mkdir(exist_ok=True, parents=True)
-    plt.savefig(save_name)
-    plt.close(fig)
-    # sys.exit(0)
-
-
-
+    return fig
 
 
 def int_tuple(s):

@@ -6,91 +6,35 @@ import sys
 from pathlib import Path
 import numpy as np
 import torch
-from sgan.utils import relative_to_abs, save_trajectory_plot, plot_trajectories, abs_to_relative
+from sgan.utils import relative_to_abs, save_trajectory_plot, plot_trajectories, abs_to_relative, plot_trajectory_plot, \
+    save_figs, close_figs
 from sgan.data.trajectories import read_file
 from scipy.spatial.transform import Rotation as R
 
 _DEVICE_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def goal_experiment(batch_no, first, generator, goal_state, i, obs_traj, obs_traj_rel, ota, pred_traj_gt, ptga,
-                    seq_start_end):
-    for j, x in enumerate(torch.linspace(0, 4, 8)):
-        if first:
-            goal_state = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
-            goal_state[0, 0] = pred_traj_gt[-1, 0]
-            first = False
-        # if a ped enters or leaves scene shape of goal must change to reflect this
-        elif goal_state.shape[1] != obs_traj.shape[1]:
-            temp = goal_state[0, 0, 1]
-            goal_state = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
-            goal_state[0, 0] = pred_traj_gt[-1, 0]
-            goal_state[0, 0, 1] = temp
-        # goal_state[0, 0, 1] -= x
-        goal_state[0, 0, 0] -= x
-        # print(goal_state.shape)
-        # pred_traj_gt[-1].reshape(1, -1, 2)
-        pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state)
-        ptfa = relative_to_abs(pred_traj_fake_rel)
-        # title = f'x_{goal_state[0, 0, 0]:.2f}_y{goal_state[0, 0, 1]:.2f}'
-        title = f'Batch {i} | {j} x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
-        # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-        save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
-    for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
-        if i == 0:
-            print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')
-    for i, ped in enumerate(pred_traj_gt.permute(1, 0, 2)):
-        if i == 0:
-            print(f'Ped {i} predicted gt\tX\n\t\t\t\t\tY\n{ped.T}')
-    if batch_no == 3:
-        sys.exit(0)
-    batch_no += 1
-
-
-def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, x=7, y=14, atol=0.5, coltol=0.2):
+def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, x=None, y=None, atol=0.5, coltol=0.2, goal_aggro=0.5):
     with torch.no_grad():
         successes = 0
         social_breach = 0
         fails = 0
+        seqs = 0
         for i, batch in enumerate(loader):
-            (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
-             non_linear_ped, loss_mask, seq_start_end) = batch
+            obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped, loss_mask, seq_start_end = batch
 
-            # ota = obs_traj.numpy()
-            # ptga = pred_traj_gt.numpy()
 
-            save_directory = Path(f'/home/david/Pictures/plots/eval/{model_name}').with_suffix('').__str__()
-            # if i == 0:
-            #     continue
-
-            # start = time.perf_counter()
             goal_state = create_goal_state(dpath=dpath, pred_len=generator.goal.pred_len,
                                            goal_obs_traj=obs_traj[::, [index[0] for index in seq_start_end]],
                                            pred_traj_gt=pred_traj_gt[::, [index[0] for index in seq_start_end]])
-            # print(f'Getting goal states took {time.perf_counter() - start:.2f}s')
-            # goal_state = pred_traj_gt[-1, [index[0] for index in seq_start_end]].unsqueeze(0)
-            # print(f'Batch {i} goal states\n:{goal_state}')
-            #TODO consider how goal state in training changes each time but does not change each iter for eval
-            pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.7)
-            ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=obs_traj[-1])
-            # for k, (s, e) in enumerate(seq_start_end):
-            #     title = f'Batch {i}  Seq {k} Iter {j}'
-            #     ptitle = f'Batch {i}  Seq {k} ' \
-            #              f'Goal {goal_state[0, k, 0].item():.2f}m {goal_state[0, k, 1].item():.2f}m'
-            #
-            #     save_trajectory_plot(ota[::, s:e], ptga[::, s:e], ptfa[::, s:e], save_name=title, plot_title=ptitle,
-            #                          save_directory=save_directory,
-            #                          xlim=[-2.5, 15], ylim=[0, 10])
-            #
-            # goal_x = goal_state[0, 0, 0].item() - obs_traj[-1, 0, 0]
-            # goal_y = goal_state[0, 0, 1].item() - obs_traj[-1, 0, 1]
-            # goal_x = goal_state[0, 0, 0].item()
-            # goal_y = goal_state[0, 0, 1].item()
 
             for k, (s, e) in enumerate(seq_start_end):
+                save_directory = Path(f'/home/david/Pictures/plots/goal_test/{model_name}/Seq {k}').with_suffix('').__str__()
                 # goal_state[0, k, 0] = x
                 # goal_state[0, k, 1] = y
-
+                # TODO consider how goal state in training changes each time but does not change each iter for eval
+                snames = []
+                figs = []
                 for j in range(iters):
                     # print(goal_state[0 ,s].shape)
                     # print(obs_traj[-1, s].shape)
@@ -100,42 +44,72 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     ptitle = f'Goal Batch {i}  Seq {k} Iter {j} ' \
                              f'Goal {goal_state[0, k, 0].item():.2f}m {goal_state[0, k, 1].item():.2f}m'
 
-                    pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=1)
+                    pred_traj_fake_rel = generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=goal_aggro)
                     ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=obs_traj[-1])
 
                     # social compliance check
                     coll_pt = social_compliance_check(obs_traj[-1, s:e], tolerance=coltol)
-                    # save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
-                    #                      goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt, col_tol=coltol,
-                    #                      plot_title=ptitle, save_name=title, save_directory=save_directory,
-                    #                      xlim=[-2.5, 15], ylim=[0, 10])
+                    # if j == 0:
+
+                        # Save plot
+                        # plot_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
+                        #                      goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt,
+                        #                      col_tol=coltol,
+                        #                      plot_title=ptitle, save_name=title, save_directory=save_directory,
+                        #                      xlim=[-30, 30], ylim=[-30, 30])
+                    # if x is None:
+                    #     x = float(input('Goal x value: '))
+                    #     goal_state[0, k, 0] = x
+                    # if y is None:
+                    #     y = float(input('Goal y value: '))
+                    #     goal_state[0, k, 1] = y
+                    # # Save plot
+                    sname, fig = save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
+                                         goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt,
+                                         col_tol=coltol,
+                                         plot_title=ptitle, save_name=title, save_directory=save_directory,
+                                         xlim=[-30, 30], ylim=[-30, 30])
+                    snames.append(sname)
+                    figs.append(fig)
                     if goal_arrival_check(observed_point=obs_traj[-1, s], goal=goal_state[0, k], tolerance=atol):
                         successes += 1
                         print('Goal Reached.')
+                        save_figs(snames, figs)
+                        x, y = None, None
                         break
                     elif coll_pt is not None:
                         social_breach += 1
                         print('Social Breach.')
+                        close_figs(figs)
+                        x, y = None, None
                         break
                     obs_traj, obs_traj_rel = update_observations(s, e, j, obs_traj, pred_traj_gt, ptfa)
 
-                    # # Reduce goals by husky's next planned step
-                    # goal_x = goal_state[0, 0, 0].item() - obs_traj[-1, 0, 0]
-                    # goal_y = goal_state[0, 0, 1].item() - obs_traj[-1, 0, 1]
-                    # if j > iters//2:
-                    #     goal_state[0, 0, 0] = 8
-                    #     goal_state[0, 0, 1] = 8
+                    # update_goalstate(goal_state, iters, j, obs_traj)
                     if j == iters - 1:
                         print('Goal not reached in time.')
+                        close_figs(figs)
                         fails += 1
+                        x, y = None, None
+                seqs += 1
+            if seqs >= 96:
+                return successes, fails, social_breach, seqs
+        return successes, fails, social_breach, seqs
 
-        return successes, fails, social_breach, (i + 1) * 32
+
+def update_goalstate(goal_state, iters, j, obs_traj):
+    # Reduce goals by husky's next planned step
+    goal_x = goal_state[0, 0, 0].item() - obs_traj[-1, 0, 0]
+    goal_y = goal_state[0, 0, 1].item() - obs_traj[-1, 0, 1]
+    if j > iters // 2:
+        goal_state[0, 0, 0] = 8
+        goal_state[0, 0, 1] = 8
 
 
 def social_compliance_check(obs_traj_abs, tolerance=0.2):
     """Returns centre point of circle where social compliance fails else returns None"""
     dists = obs_traj_abs - obs_traj_abs[0]
-    #TODO revise. This will only pick first collision in order of peds. Others may exist.
+    # TODO revise. This will only pick first collision in order of peds. Others may exist.
     for i, ped in enumerate(dists[1:]):
         ped = ped.numpy()
         if np.linalg.norm(ped) < tolerance:
@@ -155,18 +129,14 @@ def count_suitable_target_agents_in_dataset(dpath, loader, generator):
     trajs = 0
     good_agents = 0
     with torch.no_grad():
-        for i, batch in enumerate(loader):
+        for batch in loader:
+            obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel, non_linear_ped, loss_mask, seq_start_end = batch
 
-            (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
-             non_linear_ped, loss_mask, seq_start_end) = batch
             trajs += obs_traj.shape[1]
-
             with np.printoptions(precision=3, suppress=True):
                 for last_obs in obs_traj[-1]:
-
                     for filename in Path(dpath).rglob('*'):
                         data = read_file(filename)
-
                         if goal_point_exists(data, generator, last_obs):
                             good_agents += 1
         print(f'No. of trajs: {trajs}')
@@ -282,42 +252,6 @@ def get_goal_point(data, pred_len, last_obs):
     else:
         # print('Could not find 3*pred_len goal')
         return torch.zeros((1, 2), device=_DEVICE_)
-
-
-def create_goal_state(dpath, pred_len, goal_obs_traj, pred_traj_gt=0):
-    """
-    goal_obs_traj = obs_traj[::, [index[0] for index in seq_start_end]]
-    """
-    goal_state = torch.zeros((1, goal_obs_traj.shape[1], 2), device=_DEVICE_)
-
-    for i in range(goal_state.shape[1]):
-        last_obs = goal_obs_traj[-1, i]
-        data, match_idx = find_in_dataset(dpath, last_obs)
-
-        if not match_idx:
-            print(f'No matches for {last_obs}found in any file in {dpath}')
-            # return final predicted ground truth as goal state if no match is found
-            goal_state[0, i] = pred_traj_gt[-1, i]
-
-        agent_id = data[match_idx, 1]
-        subset = data[match_idx::]
-        frames_w_agent = np.argwhere(subset[::, 1] == agent_id)
-
-        # If the goal index is within dataset size and the agent id of the goal
-        # line matches the matching line
-        if subset[frames_w_agent].shape[0] > 3 * pred_len:
-            agent_goal_frame = subset[frames_w_agent][3 * pred_len]
-            # print('3*pred_len goal chosen')
-        else:
-            agent_goal_frame = subset[frames_w_agent][-1]
-            # print(f'Goal {subset[frames_w_agent].shape[0] - 1} frames ahead chosen')
-        goal_idx = int(np.argwhere(np.all(data == agent_goal_frame, axis=1)))
-        # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames after frame {data[match_idx, 0]}.')
-        # print(f'Match index: {match_idx} [Line no. {match_idx+1}]')
-        # print(f'Goal index {goal_idx} [Line no. {goal_idx+1}]')
-        goal_state[0, i] = torch.tensor(data[goal_idx, 2:])
-
-    return goal_state
 
 
 def find_in_dataset(dpath, last_obs):
@@ -458,48 +392,44 @@ def seek_goal_simulated_data(generator, x, y, iters=60, x_start=0, y_start=0, ar
             #     suffix = f'| x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
 
 
-def create_goal_states(obs_traj, pred_traj_gt, seq_start_end):
-    plot_trajectories(obs_traj, pred_traj_gt, pred_traj_gt * 0, seq_start_end.numpy())
-    chosen_ped_id, x, y = manual_goal_select(obs_traj, pred_traj_gt)
+def create_goal_state(dpath, pred_len, goal_obs_traj, pred_traj_gt=0, relative=True):
+    """
+    goal_obs_traj = obs_traj[::, [index[0] for index in seq_start_end]]
+    """
+    goal_state = torch.zeros((1, goal_obs_traj.shape[1], 2), device=_DEVICE_)
 
-    goal_point = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
-    goal_point[0, chosen_ped_id, 0] = x
-    goal_point[0, chosen_ped_id, 1] = y
-    print(f'Goal Point:\n{goal_point}')
-    return goal_point
+    for i in range(goal_state.shape[1]):
+        last_obs = goal_obs_traj[-1, i]
+        data, match_idx = find_in_dataset(dpath, last_obs)
 
+        if not match_idx:
+            print(f'No matches for {last_obs}found in any file in {dpath}')
+            # return final predicted ground truth as goal state if no match is found
+            goal_state[0, i] = pred_traj_gt[-1, i]
 
-def manual_goal_select(obs_traj, pred_traj_gt):
-    chosen_ped_id = int(input(f'Choose pedestrian [0... {obs_traj.shape[1] - 1}]to give goal: '))
-    for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
-        if i == chosen_ped_id:
-            print(f'Ped {i} observed traj\n\t\t\tX\t\tY\n{ped}')
-    for i, ped in enumerate(pred_traj_gt.permute(1, 0, 2)):
-        if i == chosen_ped_id:
-            print(f'Ped {i} predicted gt\n\t\t\tX\t\tY\n{ped}')
-    x = int(input('Choose x goal: '))
-    y = int(input('Choose y goal: '))
-    return chosen_ped_id, x, y
+        agent_id = data[match_idx, 1]
+        subset = data[match_idx::]
+        frames_w_agent = np.argwhere(subset[::, 1] == agent_id)
 
+        # If the goal index is within dataset size and the agent id of the goal
+        # line matches the matching line
+        if subset[frames_w_agent].shape[0] > 3 * pred_len:
+            agent_goal_frame = subset[frames_w_agent][3 * pred_len]
+            # print('3*pred_len goal chosen')
+        else:
+            agent_goal_frame = subset[frames_w_agent][-1]
+            # print(f'Goal {subset[frames_w_agent].shape[0] - 1} frames ahead chosen')
+        goal_idx = int(np.argwhere(np.all(data == agent_goal_frame, axis=1)))
+        # print(f'Agent is in {subset[frames_w_agent].shape[0] - 1} further frames after frame {data[match_idx, 0]}.')
+        # print(f'Match index: {match_idx} [Line no. {match_idx+1}]')
+        # print(f'Goal index {goal_idx} [Line no. {goal_idx+1}]')
 
-def load_next_seq(i, dset):
-    # (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
-    #  non_linear_ped, loss_mask) = dset[i]
-    # ota = obs_traj.numpy()
-    # for k, ped in enumerate(obs_traj):
-    #     if k == 0:
-    #         print(f'Ped {k} i {i} obs_traj[-1]\t\tX\tY\t{ped.T[-1]}')
-    # ptga = pred_traj_gt.numpy()
-    # for k, ped in enumerate(pred_traj_gt):
-    #     if k == 0:
-    #         print(f'Ped {k} i {i} pred_traj_gt[0]\tX\tY\t{ped.T[0]}')
-    # print('-'*100)
-    (obs_traj, pred_traj_gt, obs_traj_rel, pred_traj_gt_rel,
-     non_linear_ped, loss_mask) = dset[i + 2]
-    # for k, ped in enumerate(pred_traj_gt):
-    #     if k == 0:
-    #         print('Goal state 3*pred_len:')
-    #         print(f'Ped {k} i {i + 2} pred_traj_gt[0]\tX\tY\t{ped.T[0]}')
-    # print('-' * 100)
-    # sys.exit(0)
-    return pred_traj_gt[-1]
+        # print(f'Obs pt: {last_obs}')
+        if relative:
+            goal_state[0, i] = torch.tensor(data[goal_idx, 2:]) - last_obs
+            # print(f'Rel Goal: {goal_state[0, i]}')
+        else:
+            goal_state[0, i] = torch.tensor(data[goal_idx, 2:])
+            # print(f'Abs Goal: {goal_state[0, i]}')
+
+    return goal_state
