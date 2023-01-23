@@ -446,7 +446,7 @@ def create_goal_state(dpath, pred_len, goal_obs_traj, pred_traj_gt=0, relative=T
         if relative:
             # cuda0 = torch.device('cuda:0')
             # relative_to = last_obs.clone().to(cuda0)
-            goal_state[0, i] = torch.tensor(data[goal_idx, 2:] - last_obs.numpy(), device=goal_state.device())
+            goal_state[0, i] = torch.tensor(data[goal_idx, 2:] - last_obs.numpy())
             # print(f'Rel Goal: {goal_state[0, i]}')
         else:
             goal_state[0, i] = torch.tensor(data[goal_idx, 2:])
