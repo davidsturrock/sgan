@@ -74,8 +74,8 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     if goal_arrival_check(observed_point=obs_traj[-1, s], goal=goal_state[0, k], tolerance=atol):
                         successes += 1
                         print('Goal Reached.')
-                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{model_name}/success/Seq {k}')\
-                            .with_suffix('').__str__()
+                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{Path(model_name.with_suffix(""))}'
+                                              f'/success/Seq {k}').__str__()
                         obs_list, pred_list = save_plots_empty_lists(atol, coll_pt, coltol, goal_state, k, obs_list,
                                                                      pred_list, ptitle, save_directory, title)
                         x, y = None, None
@@ -83,8 +83,8 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     elif coll_pt is not None:
                         social_breach += 1
                         print('Social Breach.')
-                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{model_name}/breach/Seq {k}')\
-                            .with_suffix('').__str__()
+                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{Path(model_name.with_suffix(""))}'
+                                              f'/social breach/Seq {k}').__str__()
                         obs_list, pred_list = save_plots_empty_lists(atol, coll_pt, coltol, goal_state, k, obs_list,
                                                                      pred_list, ptitle, save_directory, title)
                         x, y = None, None
@@ -441,8 +441,9 @@ def create_goal_state(dpath, pred_len, goal_obs_traj, pred_traj_gt=0, relative=T
         # print(f'Goal index {goal_idx} [Line no. {goal_idx+1}]')
 
         # print(f'Obs pt: {last_obs}')
+        relative_to = last_obs.clone().to(_DEVICE_)
         if relative:
-            goal_state[0, i] = torch.tensor(data[goal_idx, 2:]) - last_obs.to(_DEVICE_)
+            goal_state[0, i] = torch.tensor(data[goal_idx, 2:]) - relative_to
             # print(f'Rel Goal: {goal_state[0, i]}')
         else:
             goal_state[0, i] = torch.tensor(data[goal_idx, 2:])
