@@ -142,8 +142,9 @@ class Plotter:
         self.ylim = [-10, 10] if ylim is None else ylim
         self.xlim = [-5, 15] if xlim is None else xlim
         plt.ion()
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot()
+        # self.fig = plt.figure()
+        # self.ax = self.fig.add_subplot()
+        self.fig, self.ax = plt.subplots()
         self.prev_x = []
         self.prev_y = []
         self.ax.set_xlabel('X [m]')
@@ -157,7 +158,7 @@ class Plotter:
         # self.ax.set_ylim([-5,5])
         # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
-    def display(self, title, ota, ptfa, sse, save_name='live_plot', save_dir=' /home/administrator/code/sgan/plots'):
+    def display(self, title, ota, ptfa, sse, save_name='live_plot', save_dir=' /home/administrator/code/sgan/plots', circle=None):
         """
         ota: observed_trajector_absolute
         ptfa: predicted_trajectory_fake_absolute
@@ -168,6 +169,9 @@ class Plotter:
         self.ax.clear()
         self.ax.set_xlabel('X [m]')
         self.ax.set_ylabel('Y [m]')
+        if circle is None:
+            circle = []
+
 
         # loc = 'center left',
         plt.axis('square')
@@ -198,6 +202,9 @@ class Plotter:
                     self.ax.plot(ota[::, j, 0], ota[::, j, 1], c=cmap[j - 1], linestyle='', marker='.')
                                  # ,markersize=2)
                     self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c=cmap[j - 1], linestyle='', markersize=1, marker='*')
+        # if len(circle):
+        #     circ = plt.Circle(circle, 0.5, color='r', fill=False)
+        #     self.ax.add_patch(circle)
 
             self.ax.plot(self.prev_x[-8::], self.prev_y[-8::], linestyle=None, marker='.', markersize=1, c='dimgrey')
         # self.ax.legend()

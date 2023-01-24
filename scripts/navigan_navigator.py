@@ -178,6 +178,10 @@ class Navigator:
         self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x
         # + self.obs_traj[-1, 0, 0].item()
         self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
+        # Check all values are same, if so most likely dead point from out of scene. Reset to 100
+        # if np.all([self.obs_traj[::, int(tracked_pts.z)] == self.obs_traj[0, int(tracked_pts.z)]], axis=0):
+        #     self.obs_traj[::, int(tracked_pts.z), 0] = 100
+        #     self.obs_traj[::, int(tracked_pts.z), 1] = 100
         # + self.obs_traj[-1, 0, 1].item()
         # # for i, pt in enumerate(tracked_pts):
         # #     self.obs_traj[-1, i, 0] = pt[0]
@@ -216,8 +220,8 @@ class Navigator:
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
             obs_traj_rel = abs_to_relative(self.obs_traj)
-            obs_traj_rel[::, 1] = 0
-            self.obs_traj[::, 1] = 0
+            # obs_traj_rel[::, 1] = 0
+            # self.obs_traj[::, 1] = 0
             # obs_traj_rel = torch.ones((self.obs_len, 1, 2), device=_DEVICE_) * 0.8
             seq_start_end = torch.tensor([0, self.obs_traj.shape[1]], device=_DEVICE_).unsqueeze(0)
             # seq_start_end = torch.tensor([0, 1], device=_DEVICE_).unsqueeze(0)
@@ -240,7 +244,7 @@ class Navigator:
             #     print(self.obs_traj[::, 0:2, 0].T)
             #     print(self.obs_traj[::, 0:2, 1].T)
             # print(self.obs_traj[, 1].T)
-            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.0)
+            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
             # with np.printoptions(precision=2, suppress=True):
             #     print(f'Rel Pred Ped 0:\n{pred_traj_fake_rel[::, 1].T}')
             #     print(f'Abs Observed Ped 0:\n{self.obs_traj[::, 1].T}')
@@ -253,8 +257,10 @@ class Navigator:
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
             self.plotter.xlim = [self.obs_traj[-1, 0, 0] + -5, self.obs_traj[-1, 0, 0] + 5]
             self.plotter.ylim = [self.obs_traj[-1, 0, 1] + -5, self.obs_traj[-1, 0, 1] + 5]
-            self.plotter.display(title=f'x: {self.goal.x:.2f}m y: {self.goal.y:.2f}m', ota=self.obs_traj, ptfa=ptfa,
-                                 sse=seq_start_end)
+            self.plotter.display(
+                title=f'\nRel Goal {goal_state[0, 0, 0].item():.2f}m {goal_state[0, 0, 1].item():.2f}m\n' \
+                      f'Abs Goal {self.goal.x:.2f}m {self.goal.y:.2f}m', ota=self.obs_traj, ptfa=ptfa,
+                circle=[self.goal.x, self.goal.y], sse=seq_start_end)
 
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:
