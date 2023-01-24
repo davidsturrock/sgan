@@ -8,7 +8,7 @@ from attrdict import AttrDict
 from sgan.data.loader import data_loader
 from sgan.models import TrajectoryGenerator, TrajectoryDiscriminator, IntentionForceGenerator
 from sgan.losses import displacement_error, final_displacement_error
-from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories, plot_losses, save_plot_trajectory
+from sgan.utils import relative_to_abs, get_dset_path, plot_trajectories, plot_losses, save_trajectory_plot
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str)
@@ -213,7 +213,7 @@ def goal_experiment(batch_no, first, generator, goal_state, i, obs_traj, obs_tra
         # title = f'x_{goal_state[0, 0, 0]:.2f}_y{goal_state[0, 0, 1]:.2f}'
         title = f'Batch {i} | {j} x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
         # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-        save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+        save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
     for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
         if i == 0:
             print(f'Ped {i} observed traj\tX\n\t\t\t\t\tY\n{ped.T}')
@@ -253,7 +253,7 @@ def seek_goal(loader, generator, iters=8):
                 ptfa = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
                 title = f'Batch {i} iter {j} | x {goal_state[0, 0, 0]:.2f} y {goal_state[0, 0, 1]:.2f}'
                 # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-                save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+                save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
 
                 # Shift the obs traj along by one timestep using the pred_traj_fake_abs (ptfa)
                 # as the next observed point
@@ -310,7 +310,7 @@ def seek_goal_simulated_data(generator, iters=8, x=6, y=-18):
             ptfa = relative_to_abs(pred_traj_fake_rel, obs_traj[-1])
             title = f'{dir}/Iter {j} {suffix}'
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-            save_plot_trajectory(title, ota, ptga, ptfa, seq_start_end)
+            save_trajectory_plot(title, ota, ptga, ptfa, 'figure')
 
             # Shift the obs traj along by one timestep using the pred_traj_fake_abs (ptfa)
             # as the next observed point
@@ -361,30 +361,6 @@ def main(args):
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
         # seek_goal(loader, generator, iters=100)
         seek_goal_simulated_data(generator, iters=50)
-
-
-def create_goal_states(obs_traj, pred_traj_gt, seq_start_end):
-    plot_trajectories(obs_traj, pred_traj_gt, pred_traj_gt * 0, seq_start_end.numpy())
-    chosen_ped_id, x, y = manual_goal_select(obs_traj, pred_traj_gt)
-
-    goal_point = torch.zeros((1, obs_traj.shape[1], 2), device=_DEVICE_)
-    goal_point[0, chosen_ped_id, 0] = x
-    goal_point[0, chosen_ped_id, 1] = y
-    print(f'Goal Point:\n{goal_point}')
-    return goal_point
-
-
-def manual_goal_select(obs_traj, pred_traj_gt):
-    chosen_ped_id = int(input(f'Choose pedestrian [0... {obs_traj.shape[1] - 1}]to give goal: '))
-    for i, ped in enumerate(obs_traj.permute(1, 0, 2)):
-        if i == chosen_ped_id:
-            print(f'Ped {i} observed traj\n\t\t\tX\t\tY\n{ped}')
-    for i, ped in enumerate(pred_traj_gt.permute(1, 0, 2)):
-        if i == chosen_ped_id:
-            print(f'Ped {i} predicted gt\n\t\t\tX\t\tY\n{ped}')
-    x = int(input('Choose x goal: '))
-    y = int(input('Choose y goal: '))
-    return chosen_ped_id, x, y
 
 
 if __name__ == '__main__':

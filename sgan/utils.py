@@ -61,50 +61,79 @@ def plot_trajectories(obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_st
         #     save_file.parent.mkdir(exist_ok=True, parents=True)
         #     plt.savefig(save_file, bbox_inches='tight')
         plt.show()
-        # plt.waitforbuttonpress()
         plt.close()
 
 
-def save_plot_trajectory(title, obs_traj_abs, pred_traj_gt_abs, pred_traj_fake_abs, seq_start_end):
-    for i, (s, e) in enumerate(seq_start_end[::, ::]):
-        # print(f'i {i}, s {s},e {e}')
-        cmap = list(mcolours.TABLEAU_COLORS.keys())
-        if len(cmap) < e - s:
-            cmap = list(mcolours.CSS4_COLORS.keys())
-        fig, ax = plt.subplots()
+def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
+                         goal=None, arrival_tol=0.5, collision_point=None, col_tol=0.2,
+                         plot_title='trajectory plot', save_name='trajectory_plot',
+                         save_directory='/home/david/Pictures/plots/sgan/navigan3pred/dataset_tests', **kwargs):
+    fig = make_trajectory_plot(arrival_tol, col_tol, collision_point, goal, kwargs, obs_traj_abs, plot_title,
+                               pred_traj_abs, pred_traj_gt_abs)
+    save_directory = pathlib.Path(save_directory)
+    save_name = save_directory / f'{save_name}.png'
+    save_name.parent.mkdir(exist_ok=True, parents=True)
+    plt.savefig(save_name)
+    plt.close(fig)
 
-        for j in range(s, e):
+
+def plot_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
+                         goal=None, arrival_tol=0.5, collision_point=None, col_tol=0.2,
+                         plot_title='trajectory plot', **kwargs):
+    fig = make_trajectory_plot(arrival_tol, col_tol, collision_point, goal, kwargs, obs_traj_abs, plot_title,
+                               pred_traj_abs, pred_traj_gt_abs)
+    plt.show()
+    plt.close(fig)
+    # sys.exit(0)
+
+
+def make_trajectory_plot(arrival_tol, col_tol, collision_point, goal, kwargs, obs_traj_abs, plot_title, pred_traj_abs,
+                         pred_traj_gt_abs):
+    if goal is None:
+        goal = []
+    if collision_point is None:
+        collision_point = []
+    cmap = list(mcolours.TABLEAU_COLORS.keys())
+    if len(cmap) < obs_traj_abs.shape[1]:
+        cmap = list(mcolours.CSS4_COLORS.keys())
+    fig, ax = plt.subplots()
+    for j in range(obs_traj_abs.shape[1]):
+        if j == 0:
+
+            ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c='black', linestyle='', marker='.')
+            ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c='black', linestyle='', marker='x')
+            ax.plot(pred_traj_abs[::, j, 0], pred_traj_abs[::, j, 1], markersize=3, c='black', linestyle='', marker='*')
+        else:
             colour = cmap.pop(0)
-            l1 = ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour,
-                         linestyle='', marker='.')
-            # l2 = ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
-            l3 = ax.plot(pred_traj_fake_abs[::, j, 0], pred_traj_fake_abs[::, j, 1], markersize=3, c=colour,
-                         linestyle='',
-                         marker='*')
-
-        # plt.title(f'Goal Pt {title.split("/")[1]}')
-        plt.title(f'Goal Pt {title}')
-        plt.axis('square')
-        ax.set_xlabel('X [m]')
-        ax.set_ylabel('Y [m]')
-        plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
-        dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
-                                 markersize=5, label='Obs_traj')
-        # x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
-        #                        markersize=5, label='Pred_traj_gt')
-        star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
-                                  markersize=5, label='Pred_traj_fake')
-        # ax.legend(handles=[dot_line, x_line, star_line])
-        # ax.legend(handles=[dot_line, star_line])
-        xlim = [-5, 15]
-        ax.set_xlim(xlim)
-        ylim = [-10, 10]
-        ax.set_ylim(ylim)
-        save_file = pathlib.Path('/home/administrator/code/sgan/plots') / f'{title}_seq_{i}.png'
-        save_file.parent.mkdir(exist_ok=True, parents=True)
-
-        plt.savefig(save_file)
-        plt.close(fig)
+            ax.plot(obs_traj_abs[::, j, 0], obs_traj_abs[::, j, 1], c=colour, linestyle='', marker='.')
+            ax.plot(pred_traj_gt_abs[::, j, 0], pred_traj_gt_abs[::, j, 1], c=colour, linestyle='', marker='x')
+            ax.plot(pred_traj_abs[::, j, 0], pred_traj_abs[::, j, 1], markersize=3, c=colour, linestyle='', marker='*')
+    # Add goal arrival and collision circles
+    if len(goal):
+        circle = plt.Circle(goal, arrival_tol, color='r', fill=False)
+        ax.add_patch(circle)
+    if len(collision_point):
+        collision_circle = plt.Circle(collision_point, col_tol, color='g', fill=False)
+        ax.add_patch(collision_circle)
+    plt.title(f'{plot_title}')
+    plt.axis('square')
+    ax.set_xlabel('X [m]')
+    ax.set_ylabel('Y [m]')
+    plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
+    dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
+                             markersize=5, label='Observed')
+    x_line = mlines.Line2D([], [], color='black', linestyle='', marker='x',
+                           markersize=5, label='Ground Truth')
+    star_line = mlines.Line2D([], [], color='black', linestyle='', marker='*',
+                              markersize=5, label='Predicted')
+    # ax.legend(handles=[dot_line, x_line, star_line])
+    # ax.legend(handles=[dot_line, star_line])
+    ax.legend(bbox_to_anchor=(1.37, 0.92), loc='center right', handles=[dot_line, x_line, star_line])
+    xlim = kwargs.get('xlim', [-5, 15])
+    ylim = kwargs.get('ylim', [-10, 10])
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    return fig
 
 
 class Plotter:
@@ -200,7 +229,7 @@ def int_tuple(s):
 def find_nan(variable, var_name):
     variable_n = variable.data.cpu().numpy()
     if np.isnan(variable_n).any():
-        exit('%s has nan' % var_name)
+        exit(f'{var_name} has nan')
 
 
 def bool_flag(s):
@@ -246,16 +275,12 @@ def timeit(msg, should_time=True):
 
 def get_gpu_memory():
     torch.cuda.synchronize()
-    opts = [
-        'nvidia-smi', '-q', '--gpu=' + str(1), '|', 'grep', '"Used GPU Memory"'
-    ]
+    opts = ['nvidia-smi', '-q', '--gpu=1', '|', 'grep', '"Used GPU Memory"']
     cmd = str.join(' ', opts)
-    ps = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = ps.communicate()[0].decode('utf-8')
     output = output.split("\n")[0].split(":")
-    consumed_mem = int(output[1].strip().split(" ")[0])
-    return consumed_mem
+    return int(output[1].strip().split(" ")[0])
 
 
 def get_dset_path(dset_name, dset_type):
@@ -309,17 +334,16 @@ def plot_losses(checkpoint, train: bool = True):
     l2 = ax[0, 1].plot(d_losses, 'r', linestyle='-', marker='.', markersize=0.1, label='Discriminator Losses')
     l3 = ax[1, 0].plot(fde, 'b', linestyle='-', marker='.', markersize=0.1, label=f'{key} FDE')
     l4 = ax[1, 1].plot(ade, 'c', linestyle='-', marker='.', markersize=0.1, label=f'{key} ADE')
-    # plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-    plt.title('Metrics Graph')
-    # plt.axis('square')
+
+    plt.suptitle(f"Network Trained for {checkpoint['counters']['epoch']} epochs.")
+    fig.tight_layout(rect=[0, 0.03, 1, 0.9], pad=2)
     for a in ax.flat:
-        a.set_xlabel('Epoch')
+        a.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+        a.set_xlabel('Epochs')
         a.set_ylabel('Loss')
         a.legend()
-    # plt.grid(which='both', axis='both', linestyle='-', linewidth=0.5)
 
     plt.show()
-    plt.waitforbuttonpress()
     plt.close(fig)
 
 
