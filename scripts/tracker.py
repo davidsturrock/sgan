@@ -14,6 +14,14 @@ sys.path.insert(0, '/home/administrator/code/aru-core/ped/lib/')
 # import aru_py_logger
 import aru_py_pedestrian
 
+def pull_to_centre(x, y, r_pull = 1):
+    theta = np.arctan2(y,x)
+    # radius = np.linalg.norm(x,y)
+    x_pull = r_pull * np.cos(theta)
+    y_pull = r_pull * np.sin(theta)
+    x_new = x - x_pull
+    y_new = y - y_pull
+    return x_new, y_new
 
 class Tracker:
     def __init__(self, pub_topic='/tracked/pedestrians', odom_topic='/odometry/filtered',
@@ -72,7 +80,7 @@ class Tracker:
         self.time_out = int(time.perf_counter())
         self.lidar_callback_status = True
 
-    def publish_tracked_pts(self):
+    def publish_tracked_pts(self, bring_in=1, min_dist=0.2):
         # Init tracker if not done
         if not self.init:
             self.pedestrian.init_tracker(self.cloud_points, self.time_out)
@@ -92,11 +100,16 @@ class Tracker:
                 # point( x coord, y coord, agent id no.)
                 # point = Point(tracks[agent_id, 1], -tracks[agent_id, 0], agent_id)
                 point_mat = np.eye(4)
-                point_mat[:3, 3] = np.array([tracks[agent_id, 1], -tracks[agent_id, 0], 0]).T
+                # bring points in to increase sensitivity of network preds
+                # x = tracks[agent_id, 1] // tracks[agent_id, 1] * (max(abs(tracks[agent_id, 1]) - bring_in, min_dist))
+                # y = - (tracks[agent_id, 0] // tracks[agent_id, 0] * (max(abs(tracks[agent_id,0]) - bring_in, min_dist))
+                x, y = pull_to_centre(x=tracks[agent_id, 1], y=-tracks[agent_id, 0], r_pull=1.5)
+                point_mat[:3, 3] = np.array([x, y, 0]).T
                 transformed_pts = self.tf @ point_mat
                 # transformed_pts[0, 3] += self.odom.pose.position.y
                 # transformed_pts[1, 3] += self.odom.pose.position.x
                 point = Point(transformed_pts[0, 3], transformed_pts[1, 3], agent_id)
+                print(point)
                 self.publisher.publish(point)
                 time.sleep(0.05)
 
@@ -107,7 +120,7 @@ class Tracker:
 if __name__ == '__main__':
     tracker = Tracker()
     tracker.setup()
-    rate = rospy.Rate(3)
+    rate = rospy.Rate(2.5)
     print('Waiting for lidar')
     while not tracker.lidar_callback_status:
         pass
