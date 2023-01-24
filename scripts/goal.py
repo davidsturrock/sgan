@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 import numpy as np
 import torch
-from sgan.utils import relative_to_abs, save_trajectory_plot, plot_trajectories, abs_to_relative, plot_trajectory_plot, \
-    save_figs, close_figs
+
+from sgan.utils import relative_to_abs, save_trajectory_plot, plot_trajectories, abs_to_relative, plot_trajectory_plot
 from sgan.data.trajectories import read_file
 from scipy.spatial.transform import Rotation as R
 
@@ -55,40 +55,42 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                     # if j < 8:
                     #
                     # # Save plot
-                    #     plot_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
-                    #                          goal=goal_centres[0,k], arrival_tol=atol, collision_point=coll_pt,
-                    #                          col_tol=coltol,
-                    #                          plot_title=ptitle)
-                    # if x is None:
-                    #     x = float(input('Goal x value: '))
-                    #     goal_state[0, k, 0] = x
-                    # if y is None:
-                    #     y = float(input('Goal y value: '))
-                    #     goal_state[0, k, 1] = y
-                    # # Save plot
-                    # save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
-                    #                      goal=goal_state[0, k], arrival_tol=atol, collision_point=coll_pt,
-                    #                      col_tol=coltol,
-                    #                      plot_title=ptitle, save_name=title, save_directory=save_directory,
-                    #                      xlim=[-30, 30], ylim=[-30, 30])
+                    if x is None or y is None:
+                        plot_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
+                                             goal=goal_centres[0,k], arrival_tol=atol, collision_point=coll_pt,
+                                             col_tol=coltol,
+                                             plot_title=ptitle)
+                    if x is None:
+                        x = float(input('Goal x value: '))
+                        goal_centres[0, k, 0] = x
+                    if y is None:
+                        y = float(input('Goal y value: '))
+                        goal_centres[0, k, 1] = y
+                    # Save plot
+                    save_directory = Path(f'/home/david/Pictures/plots/goal_test/{Path(model_name).with_suffix("")}'
+                                          f'/Goal_Exp/Aggro {goal_aggro} X {x:.2f} Y {y:.2f}').__str__()
+                    save_trajectory_plot(obs_traj[5:, s:e], pred_traj_gt[20::, s:e], ptfa[:3, s:e],
+                                         goal=goal_centres[0, k], arrival_tol=atol, collision_point=coll_pt,
+                                         col_tol=coltol,
+                                         plot_title=ptitle, save_name=title, save_directory=save_directory)
 
                     if goal_arrival_check(observed_point=obs_traj[-1, s], goal=goal_state[0, k], relative=True, tolerance=atol):
                         successes += 1
                         print('Goal Reached.')
-                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{Path(model_name).with_suffix("")}'
-                                              f'/Aggro {goal_aggro} Iter {iters}/Success/Batch {i}/Seq {k}').__str__()
-                        obs_list, pred_list = save_plots_empty_lists(i, atol, coll_pt, coltol, goal_centres, k, obs_list,
-                                                                     pred_list, save_directory)
+                        # save_directory = Path(f'/home/david/Pictures/plots/goal_test/{Path(model_name).with_suffix("")}'
+                        #                       f'/Aggro {goal_aggro} Iter {iters}/Success/Batch {i}/Seq {k}').__str__()
+                        # obs_list, pred_list = save_plots_empty_lists(i, atol, coll_pt, coltol, goal_centres, k, obs_list,
+                        #                                              pred_list, save_directory)
 
                         x, y = None, None
                         break
                     elif coll_pt is not None:
                         social_breach += 1
                         print('Social Breach.')
-                        save_directory = Path(f'/home/david/Pictures/plots/goal_test/{Path(model_name).with_suffix("")}'
-                                              f'/Aggro {goal_aggro} Iter {iters}/social breach/Batch {i}/Seq {k}').__str__()
-                        obs_list, pred_list = save_plots_empty_lists(i, atol, coll_pt, coltol, goal_centres, k, obs_list,
-                                                                     pred_list, save_directory)
+                        # save_directory = Path(f'/home/david/Pictures/plots/goal_test/{Path(model_name).with_suffix("")}'
+                        #                       f'/Aggro {goal_aggro} Iter {iters}/social breach/Batch {i}/Seq {k}').__str__()
+                        # obs_list, pred_list = save_plots_empty_lists(i, atol, coll_pt, coltol, goal_centres, k, obs_list,
+                        #                                              pred_list, save_directory)
                         x, y = None, None
                         break
                     # print(f'Goal state {goal_state[0, k]} Goal Centre {goal_centres[0, k]} Obs_traj {obs_traj[-1, s]}')
@@ -104,8 +106,11 @@ def evaluate_model_trajectories(dpath, loader, generator, model_name, iters=50, 
                         pred_list = []
                         fails += 1
                         x, y = None, None
+                with open(f'{save_directory}/exp_stats.txt', 'a') as f:
+                    f.write(f'Goal Batch {i}  Seq {k} Final Distance to Goal {np.linalg.norm(goal_state[0,k]):.2f}m\n')
                 seqs += 1
             if seqs >= 50:
+
                 return successes, fails, social_breach, seqs
         return successes, fails, social_breach, seqs
 

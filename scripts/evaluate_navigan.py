@@ -81,7 +81,7 @@ def main(args):
     else:
         paths = [args.model_path]
 
-    for path, aggro in zip(paths, [0.5]):
+    for path in paths:
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         generator = get_combined_generator(checkpoint)
         _args = AttrDict(checkpoint['args'])
@@ -95,7 +95,7 @@ def main(args):
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
 
         # count_suitable_target_agents_in_dataset(dpath, loader, generator)
-        goal_aggro = aggro
+        goal_aggro = float(input('Goal aggro: '))
         iters = 60
         suc, fail, sbreach, seqs = evaluate_model_trajectories(dpath, loader, generator,
                                                                model_name=f'{os.path.basename(path)}', iters=iters,

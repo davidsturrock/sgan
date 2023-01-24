@@ -77,16 +77,6 @@ def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
     plt.savefig(save_name)
     plt.close(fig)
 
-def save_figs(save_names, figures):
-    matplotlib.rcParams['figure.max_open_warning'] = 60
-    for save_name, figure in zip(save_names, figures):
-        plt.savefig(save_name)
-        plt.close(figure)
-
-def close_figs(figures):
-    for figure in figures:
-        plt.close(figure)
-
 
 def plot_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
                          goal=None, arrival_tol=0.5, collision_point=None, col_tol=0.2,
