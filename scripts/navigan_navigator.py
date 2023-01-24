@@ -125,7 +125,8 @@ class Navigator:
                 msg = self.controller(tf)
                 self.publisher.publish(msg)
             else:
-                print(f'{x:.2f} > {self.control_params.dthresh} or {abs(turn_angle):.2f} > {self.control_params.ythresh}')
+                print(
+                    f'{x:.2f} > {self.control_params.dthresh} or {abs(turn_angle):.2f} > {self.control_params.ythresh}')
 
     def controller(self, tf):
         """Controller now assumes TF is within bounds. Check must be performed at higher level"""
@@ -175,9 +176,9 @@ class Navigator:
         # # point.z value contains agent id no.
         # TODO flipping x and -y for now because of wrong axes from tracker
         self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x
-                                                       # + self.obs_traj[-1, 0, 0].item()
+        # + self.obs_traj[-1, 0, 0].item()
         self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
-                                                       # + self.obs_traj[-1, 0, 1].item()
+        # + self.obs_traj[-1, 0, 1].item()
         # # for i, pt in enumerate(tracked_pts):
         # #     self.obs_traj[-1, i, 0] = pt[0]
         # #     self.obs_traj[-1, i, 1] = pt[1]
@@ -221,7 +222,8 @@ class Navigator:
             seq_start_end = torch.tensor([0, self.obs_traj.shape[1]], device=_DEVICE_).unsqueeze(0)
             # seq_start_end = torch.tensor([0, 1], device=_DEVICE_).unsqueeze(0)
             with np.printoptions(precision=3, suppress=True):
-                goal_state = torch.zeros((1, self.obs_traj.shape[1], 2), device=_DEVICE_)
+                goal_state = torch.zeros((1, 1, 2), device=_DEVICE_)
+
                 # goal_state[0, agent_id] = pred_traj_gt[-1, agent_id]
                 # goal_state[0, agent_id, 0] = x
 
@@ -237,18 +239,20 @@ class Navigator:
             # with np.printoptions(precision=2, suppress=True):
             #     print(self.obs_traj[::, 0:2, 0].T)
             #     print(self.obs_traj[::, 0:2, 1].T)
-                # print(self.obs_traj[, 1].T)
+            # print(self.obs_traj[, 1].T)
             pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.0)
-            with np.printoptions(precision=2, suppress=True):
-                print(f'Rel Pred Ped 0:\n{pred_traj_fake_rel[::, 1].T}')
-                print(f'Abs Observed Ped 0:\n{self.obs_traj[::, 1].T}')
-                print(f'Rel Observed Ped 0:\n{obs_traj_rel[::, 1].T}')
+            # with np.printoptions(precision=2, suppress=True):
+            #     print(f'Rel Pred Ped 0:\n{pred_traj_fake_rel[::, 1].T}')
+            #     print(f'Abs Observed Ped 0:\n{self.obs_traj[::, 1].T}')
+            #     print(f'Rel Observed Ped 0:\n{obs_traj_rel[::, 1].T}')
             start_pos = self.obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
             # print(ptfa[::,0].T)
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
+            self.plotter.xlim = [self.obs_traj[-1, 0, 0] + -5, self.obs_traj[-1, 0, 0] + 5]
+            self.plotter.ylim = [self.obs_traj[-1, 0, 1] + -5, self.obs_traj[-1, 0, 1] + 5]
             self.plotter.display(title=f'x: {self.goal.x:.2f}m y: {self.goal.y:.2f}m', ota=self.obs_traj, ptfa=ptfa,
                                  sse=seq_start_end)
 

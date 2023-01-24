@@ -246,7 +246,7 @@ def pts_to_tfs(pred_traj_fake_rel):
         # print(f'{turn_angle} deg')
         # print('-'*20)
 
-    return np.array(tfs)
+    return tfs
 
 
 def get_goal_point(data, pred_len, last_obs):

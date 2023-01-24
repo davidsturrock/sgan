@@ -188,7 +188,7 @@ class Plotter:
                 if j == 0:
                     self.ax.scatter(ota[-1, j, 0], ota[-1, j, 1], c="r", marker=".", zorder=10)
                                     # , label='live location')
-                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*')
+                    self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c='b', linestyle='', marker='*',markersize=3)
                     # markersize=2)
                                  # ,label='planned path')
                 # Plot pedestrians
