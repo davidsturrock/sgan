@@ -66,8 +66,8 @@ def evaluate(args, loader, dset, generator, num_samples, dset_path):
         return ade, fde
 
 
-def write(text):
-    with open('/home/david/data/SocialNav/eval_stats.txt', 'a') as f:
+def write(text, model_name):
+    with open(f'/home/david/Pictures/plots/goal_test/{model_name}/eval_stats.txt', 'a') as f:
         f.write(text)
 
 
@@ -81,7 +81,7 @@ def main(args):
     else:
         paths = [args.model_path]
 
-    for path, aggro in zip(paths, [1]):
+    for path, aggro in zip(paths, [0.5]):
         checkpoint = torch.load(path, map_location=torch.device('cpu'))
         generator = get_combined_generator(checkpoint)
         _args = AttrDict(checkpoint['args'])
@@ -90,19 +90,20 @@ def main(args):
         # plot_losses(checkpoint, train=True)
         # plot_losses(checkpoint, train=False)
 
-        ade, fde = evaluate(_args, loader, dset, generator, args.num_samples, dpath)
-        # write(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
+        # ade, fde = evaluate(_args, loader, dset, generator, args.num_samples, dpath)
+        # print(f'Model: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
         #       f' ADE: {ade:.2f}, FDE: {fde:.2f}')
+
         # count_suitable_target_agents_in_dataset(dpath, loader, generator)
         goal_aggro = aggro
         iters = 60
         suc, fail, sbreach, seqs = evaluate_model_trajectories(dpath, loader, generator,
                                                                model_name=f'{os.path.basename(path)}', iters=iters,
                                                                goal_aggro=goal_aggro)
-        print(
+        write(
             f'\nModel: {os.path.basename(path)}, Dataset: {_args.dataset_name}, Pred Len: {_args.pred_len},'
             f' Goal Aggro: {goal_aggro} No. of iters {iters} No. of seqs: '
-            f'{seqs} \nSuccesses: {suc} Fails: {fail} Social Breaches: {sbreach}\n\n')
+            f'{seqs} \nSuccesses: {suc} Fails: {fail} Social Breaches: {sbreach}\n\n', model_name=f'{Path(path).with_suffix("").name}')
         # seek_goal_simulated_data(generator, x=11, y=10, arrival_tol=2.2)
 
 

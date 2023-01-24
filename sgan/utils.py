@@ -74,9 +74,8 @@ def save_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
     save_directory = pathlib.Path(save_directory)
     save_name = save_directory / f'{save_name}.png'
     save_name.parent.mkdir(exist_ok=True, parents=True)
-    # plt.savefig(save_name)
-    # plt.close(fig)
-    return save_name, fig
+    plt.savefig(save_name)
+    plt.close(fig)
 
 def save_figs(save_names, figures):
     matplotlib.rcParams['figure.max_open_warning'] = 60
@@ -91,8 +90,7 @@ def close_figs(figures):
 
 def plot_trajectory_plot(obs_traj_abs, pred_traj_gt_abs, pred_traj_abs,
                          goal=None, arrival_tol=0.5, collision_point=None, col_tol=0.2,
-                         plot_title='trajectory plot', save_name='trajectory_plot',
-                         save_directory='/home/david/Pictures/plots/sgan/navigan3pred/dataset_tests', **kwargs):
+                         plot_title='trajectory plot', **kwargs):
     fig = make_trajectory_plot(arrival_tol, col_tol, collision_point, goal, kwargs, obs_traj_abs, plot_title,
                                pred_traj_abs, pred_traj_gt_abs)
     plt.show()
