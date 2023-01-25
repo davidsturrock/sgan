@@ -175,11 +175,14 @@ class Navigator:
         # # x and y coordinate from object tracker
         # # point.z value contains agent id no.
         # TODO flipping x and -y for now because of wrong axes from tracker
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x + self.obs_traj[0, 0, 0]
         # + self.obs_traj[-1, 0, 0].item()
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y + self.obs_traj[0, 0, 1]
         # Check all values are same, if so most likely dead point from out of scene. Reset to 100
-        # if np.all([self.obs_traj[::, int(tracked_pts.z)] == self.obs_traj[0, int(tracked_pts.z)]], axis=0):
+        # if np.all(self.obs_traj[::, int(tracked_pts.z), 0].numpy() ==
+        #           self.obs_traj[0, int(tracked_pts.z), 0].item()) \
+        #         and np.all(self.obs_traj[::, int(tracked_pts.z), 1].numpy() ==
+        #                    self.obs_traj[0, int(tracked_pts.z), 1].item()):
         #     self.obs_traj[::, int(tracked_pts.z), 0] = 100
         #     self.obs_traj[::, int(tracked_pts.z), 1] = 100
         # + self.obs_traj[-1, 0, 1].item()
@@ -193,15 +196,15 @@ class Navigator:
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
         # if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
-        if 1 / (time.perf_counter() - self.odom_last_callback) > 10:
+        if 1 / (time.perf_counter() - self.odom_last_callback) > 2.5:
             return
         self.odom = odom.pose
         # self.husky_odom.append([self.odom.pose.position.x, self.odom.pose.position.y])
         # Slide husky points along by one
-        self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
+        # self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
         # Update latest observed pts with new odom x and y
-        self.obs_traj[-1, 0, 0] = self.odom.pose.position.x
-        self.obs_traj[-1, 0, 1] = self.odom.pose.position.y
+        # self.obs_traj[-1, 0, 0] = self.odom.pose.position.x
+        # self.obs_traj[-1, 0, 1] = self.odom.pose.position.y
         # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
         self.odom_callback_status = True
 
@@ -210,16 +213,17 @@ class Navigator:
     def goal_callback(self, goal: Point):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
+        self.abs_goal = [goal.x, goal.y]
         self.goal = goal
         self.goal.x -= self.obs_traj[-1, 0, 0].item()
         self.goal.y -= self.obs_traj[-1, 0, 1].item()
         self.goal_status = True
 
-    def seek_live_goal(self, agent_id=0, x=40, y=10, title='live_exp'):
+    def seek_live_goal(self, agent_id=0, x=40, y=10, title='live_exp', filename=None):
         # self.goal = Point(x - self.obs_traj[-1, 0, 0].item() , y - self.obs_traj[-1, 0, 1].item(), 0)
         with torch.no_grad():
             pred_traj_gt = torch.zeros(self.obs_traj.shape, device=_DEVICE_)
-            obs_traj_rel = abs_to_relative(self.obs_traj)
+            # obs_traj_rel = abs_to_relative(self.obs_traj)
             # obs_traj_rel[::, 1] = 0
             # self.obs_traj[::, 1] = 0
             # obs_traj_rel = torch.ones((self.obs_len, 1, 2), device=_DEVICE_) * 0.8
@@ -232,6 +236,8 @@ class Navigator:
                 # goal_state[0, agent_id, 0] = x
 
                 goal_state[0, agent_id, 0] = self.goal.x - self.obs_traj[-1, 0, 0].item()
+                # TODO remove need for flipping x
+                # goal_state[0, agent_id, 0] = -goal_state[0, agent_id, 0]
                 # goal_state[0, agent_id, 1] = y
                 goal_state[0, agent_id, 1] = self.goal.y - self.obs_traj[-1, 0, 1].item()
                 # print(f'X {self.goal.x:.2f}, Y {self.goal.y:.2f}')
@@ -244,23 +250,36 @@ class Navigator:
             #     print(self.obs_traj[::, 0:2, 0].T)
             #     print(self.obs_traj[::, 0:2, 1].T)
             # print(self.obs_traj[, 1].T)
-            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
+            # TODO Resolve pred imbalance for now flip x - axis
+            obs_traj = self.obs_traj
+            # obs_traj[::, ::, 0] = -obs_traj[::, ::, 0]
+            obs_traj_rel = abs_to_relative(obs_traj)
+            pred_traj_fake_rel = self.generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
+            self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
+
+            # pred_traj_fake_rel[::, ::, 0] = -pred_traj_fake_rel[::, ::, 0]
             # with np.printoptions(precision=2, suppress=True):
             #     print(f'Rel Pred Ped 0:\n{pred_traj_fake_rel[::, 1].T}')
             #     print(f'Abs Observed Ped 0:\n{self.obs_traj[::, 1].T}')
             #     print(f'Rel Observed Ped 0:\n{obs_traj_rel[::, 1].T}')
-            start_pos = self.obs_traj[-1]
+            start_pos = obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
+            self.obs_traj[-1, 0] = ptfa[0, 0]
+            with open(filename, 'a') as f:
+                p = ptfa.numpy()
+                f.write(f'{p[0, 0, 0]:.3f}\t{p[0, 0, 1]:.3f}\n')
+
             # print(ptfa[::,0].T)
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
             self.plotter.xlim = [self.obs_traj[-1, 0, 0] + -5, self.obs_traj[-1, 0, 0] + 5]
             self.plotter.ylim = [self.obs_traj[-1, 0, 1] + -5, self.obs_traj[-1, 0, 1] + 5]
+            # abs_goal = [goal_state[0, 0, 0] + self.obs_traj[-1, 0, 0], goal_state[0, 0, 1] + self.obs_traj[-1, 0, 1]]
             self.plotter.display(
                 title=f'\nRel Goal {goal_state[0, 0, 0].item():.2f}m {goal_state[0, 0, 1].item():.2f}m\n' \
-                      f'Abs Goal {self.goal.x:.2f}m {self.goal.y:.2f}m', ota=self.obs_traj, ptfa=ptfa,
-                circle=[self.goal.x, self.goal.y], sse=seq_start_end)
+                      f'Abs Goal {self.abs_goal[0]:.2f}m {self.abs_goal[1]:.2f}m', ota=self.obs_traj, ptfa=ptfa,
+                goal_centre=self.abs_goal, sse=seq_start_end)
 
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
         #     if i == agent_id:

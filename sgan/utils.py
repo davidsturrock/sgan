@@ -179,6 +179,7 @@ class Plotter:
         # self.ax.set_ylim([-5,5])
         plt.title(f'Distance to goal\n{title}')
         if len(goal_centre):
+            # goal_centre[0] = - goal_centre[0]
             circle = plt.Circle(goal_centre, 0.5, color='r', fill=False)
             self.ax.add_patch(circle)
         for s, e in sse[::, ::]:
@@ -202,7 +203,7 @@ class Plotter:
                                  # ,markersize=2)
                     self.ax.plot(ptfa[::, j, 0], ptfa[::, j, 1], c=cmap[j - 1], linestyle='', markersize=1, marker='*')
 
-            self.ax.plot(self.prev_x[-8::], self.prev_y[-8::], linestyle=None, marker='.', markersize=1, c='dimgrey')
+            self.ax.plot(self.prev_x[::], self.prev_y[::], linestyle=None, marker='.', markersize=1, c='dimgrey')
         # self.ax.legend()
         dot_line = mlines.Line2D([], [], color='black', linestyle='', marker='.',
                                  markersize=5, label='observed agent points')

@@ -46,9 +46,9 @@ def main(args):
     while not nav.odom_callback_status:
         pass
     print('Wheel odometry received')
-    while False in np.all([nav.obs_traj[::, 0, 0].numpy()], axis=0):
-        pass
-    print('Husky observed for 8 timesteps.')
+    # while False in np.all([nav.obs_traj[::, 0, 0].numpy()], axis=0):
+    #     pass
+    # print('Husky observed for 8 timesteps.')
     #while not nav.goal_status:
     #    time.sleep(0.1)
     #print('Goal received')
@@ -57,11 +57,14 @@ def main(args):
     # sys.exit(0)
     goal_tfs = []
     accum_time = 0
+    filename = f'{time.time():.0f}_traj.txt'
+    # with open(filename, 'w') as f:
+    #     f.write('-'*60 + '\n')
     while not rospy.is_shutdown():
         start = time.perf_counter()
         # x, y = (t.item() for t in obs_traj[-1, 0])
         if len(goal_tfs) < 8:
-            pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}')
+            pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}', filename=filename)
             goal_tfs = list(pts_to_tfs(pred_rel))
         nav.goal_step(goal_tfs.pop(0))
         # nav.sleep()
@@ -77,9 +80,9 @@ def main(args):
         count += 1
         # if count > 10:
 
-        # if count >= 2:
+        if count >= 60:
         #     nav.plotter.save_video()
-        #     sys.exit(0)
+            sys.exit(0)
 
 
 if __name__ == '__main__':

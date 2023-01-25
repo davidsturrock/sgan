@@ -104,6 +104,8 @@ class Tracker:
                 # point = Point(tracks[agent_id, 1], -tracks[agent_id, 0], agent_id)
                 point_mat = np.eye(4)
                 # bring points in to increase sensitivity of network preds
+                x = tracks[agent_id, 1]
+                y = -tracks[agent_id, 0]
                 # x, y = pull_to_centre(x=tracks[agent_id, 1], y=-tracks[agent_id, 0], r_pull=r_pull, min_radius=min_radius)
                 point_mat[:3, 3] = np.array([x, y, 0]).T
                 transformed_pts = self.tf @ point_mat
