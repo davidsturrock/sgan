@@ -14,13 +14,16 @@ sys.path.insert(0, '/home/administrator/code/aru-core/ped/lib/')
 # import aru_py_logger
 import aru_py_pedestrian
 
-def pull_to_centre(x, y, r_pull = 1):
-    theta = np.arctan2(y,x)
+def pull_to_centre(x, y, r_pull=1.5, min_radius=0.2):
+    theta = np.arctan2(y, x)
     # radius = np.linalg.norm(x,y)
     x_pull = r_pull * np.cos(theta)
     y_pull = r_pull * np.sin(theta)
-    x_new = x - x_pull
-    y_new = y - y_pull
+    x_new = abs(x) / x * abs(x - x_pull) if x != 0 else min_radius * np.cos(theta)
+    y_new = abs(y) / y * abs(y - y_pull) if y != 0 else min_radius * np.sin(theta)
+    if x_new ** 2 + y_new ** 2 < min_radius ** 2:
+        x_new = min_radius * np.cos(theta)
+        y_new = min_radius * np.sin(theta)
     return x_new, y_new
 
 class Tracker:
@@ -80,7 +83,7 @@ class Tracker:
         self.time_out = int(time.perf_counter())
         self.lidar_callback_status = True
 
-    def publish_tracked_pts(self, bring_in=1, min_dist=0.2):
+    def publish_tracked_pts(self, r_pull=1.5, min_radius=0.2):
         # Init tracker if not done
         if not self.init:
             self.pedestrian.init_tracker(self.cloud_points, self.time_out)
@@ -101,13 +104,9 @@ class Tracker:
                 # point = Point(tracks[agent_id, 1], -tracks[agent_id, 0], agent_id)
                 point_mat = np.eye(4)
                 # bring points in to increase sensitivity of network preds
-                # x = tracks[agent_id, 1] // tracks[agent_id, 1] * (max(abs(tracks[agent_id, 1]) - bring_in, min_dist))
-                # y = - (tracks[agent_id, 0] // tracks[agent_id, 0] * (max(abs(tracks[agent_id,0]) - bring_in, min_dist))
-                x, y = pull_to_centre(x=tracks[agent_id, 1], y=-tracks[agent_id, 0], r_pull=1.5)
+                # x, y = pull_to_centre(x=tracks[agent_id, 1], y=-tracks[agent_id, 0], r_pull=r_pull, min_radius=min_radius)
                 point_mat[:3, 3] = np.array([x, y, 0]).T
                 transformed_pts = self.tf @ point_mat
-                # transformed_pts[0, 3] += self.odom.pose.position.y
-                # transformed_pts[1, 3] += self.odom.pose.position.x
                 point = Point(transformed_pts[0, 3], transformed_pts[1, 3], agent_id)
                 print(point)
                 self.publisher.publish(point)
