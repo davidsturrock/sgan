@@ -40,12 +40,12 @@ class GoalPublisher:
 
     def move_base_action(self):
         self.client.send_goal(self.move_goal)
-        wait = self.client.wait_for_result()
-        if not wait:
-            rospy.logerr("Action server not available!")
-            rospy.signal_shutdown("Action server not available!")
-        else:
-            return self.client.get_result()
+        # wait = self.client.wait_for_result()
+        # if not wait:
+        #     rospy.logerr("Action server not available!")
+        #     rospy.signal_shutdown("Action server not available!")
+        # else:
+            # return self.client.get_result()
 
 
 # Press the green button in the gutter to run the script.
@@ -54,9 +54,7 @@ if __name__ == '__main__':
     pub.setup()
     while not rospy.is_shutdown():
         if pub.move_goal is not None:
-            result = pub.move_base_action()
-            if result:
-                rospy.loginfo("Goal execution done!")
+            pub.move_base_action()
             print(pub.move_goal)
             pub.move_goal = None
         else:
