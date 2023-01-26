@@ -28,6 +28,8 @@ def main(args):
     # ----------------------------------------------
     # Navigator setup
     nav_args = NavOptions().parse()
+    nav_args.max_x = 0.1
+    nav_args.max_z = 0.35
     nav = Navigator(nav_args, args.model_path, rate=5)
 
     # -----------------------------------------------
@@ -63,9 +65,9 @@ def main(args):
     while not rospy.is_shutdown():
         start = time.perf_counter()
         # x, y = (t.item() for t in obs_traj[-1, 0])
-        if len(goal_tfs) < 8:
-            pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}', filename=filename)
-            goal_tfs = list(pts_to_tfs(pred_rel))
+        # if len(goal_tfs) < 8:
+        pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}', filename=filename)
+        goal_tfs = list(pts_to_tfs(pred_rel))
         nav.goal_step(goal_tfs.pop(0))
         # nav.sleep()
         # with np.printoptions(precision=2, suppress=True):

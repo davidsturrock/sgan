@@ -179,8 +179,7 @@ class Plotter:
         # self.ax.set_ylim([-5,5])
         plt.title(f'Distance to goal\n{title}')
         if len(goal_centre):
-            # goal_centre[0] = - goal_centre[0]
-            circle = plt.Circle(goal_centre, 0.5, color='r', fill=False)
+            circle = plt.Circle([-goal_centre[0], goal_centre[1]], 0.5, color='r', fill=False)
             self.ax.add_patch(circle)
         for s, e in sse[::, ::]:
             for j in range(s, e):

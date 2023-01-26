@@ -272,6 +272,7 @@ def seek_live_goal(obs_traj, generator, x, y, agent_id=0, title='live_exp'):
 def pts_to_tfs(pred_traj_fake_rel):
     tfs = []
     ptfr = pred_traj_fake_rel.numpy()[1:]
+    ptfr[::,0,0] = -ptfr[::,0,0]
     turn_angle = 0
     old_turn_angle = 0
     for i, xy in enumerate(ptfr):

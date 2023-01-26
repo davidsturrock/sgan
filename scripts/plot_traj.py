@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 
 fig, ax = plt.subplots()
-for i, f in enumerate(sorted(Path(Path.cwd()).rglob(f'1674651*.txt'))):
+for i, f in enumerate(sorted(Path(Path.cwd()).rglob(f'167465*.txt'))):
     text = np.loadtxt(fname=f)
     x = [i[0] for i in text]
     y = [i[1] for i in text]

@@ -36,7 +36,7 @@ class ControlParameters:
         """
         self.dthresh: float = args.distance_threshold
         self.ythresh: float = args.yaw_threshold
-        self.pz: float = 1 / self.ythresh
+        self.pz: float = 1
         self.max_x: float = args.max_x
         self.max_z: float = args.max_z
 
@@ -53,13 +53,14 @@ class ControlParameters:
 class Navigator:
 
     def __init__(self, args, model_path, agents=9, rate=1, odom_topic='odometry/filtered'):
-
+        self.last_times = np.ones(agents) * time.perf_counter()
         self.odom_callback_status = False
         self.tracked_agents = []
         self.husky_odom = []
         self.odom_topic = odom_topic
         self.plotter = Plotter()
         self.goal = Point(0, 0, 0)
+        self.abs_goal = [0, 0]
         self.goal_status = False
         self.callback_status = False
         self.odom = None
@@ -124,9 +125,10 @@ class Navigator:
             if x < self.control_params.dthresh and abs(turn_angle) < self.control_params.ythresh:
                 msg = self.controller(tf)
                 self.publisher.publish(msg)
-            else:
-                print(
-                    f'{x:.2f} > {self.control_params.dthresh} or {abs(turn_angle):.2f} > {self.control_params.ythresh}')
+            if x > self.control_params.dthresh:
+                print(f'{x:.2f} > {self.control_params.dthresh}')
+            if abs(turn_angle) > self.control_params.ythresh:
+                  print(f'{abs(turn_angle):.2f} > {self.control_params.ythresh}')
 
     def controller(self, tf):
         """Controller now assumes TF is within bounds. Check must be performed at higher level"""
@@ -146,7 +148,6 @@ class Navigator:
         # if self.logger is not None:
         # TODO add source and dest timestamps to logging
         # self.logger.write_to_file(tf.astype(dtype=np.float64), 0, 1)
-
         cmd_vel.angular.z = -self.control_params.pz * (0 - yaw)
         # Bound the output of controller to within max values
         if cmd_vel.angular.z > self.control_params.max_z:
@@ -156,7 +157,8 @@ class Navigator:
 
         # Use constant fwd speed if transform is within thresholds
         cmd_vel.linear.x = self.control_params.max_x
-
+        print(f'Yaw error {0 - yaw:.2f} deg')
+        print(f'Max/ Curr Angular Vel {self.control_params.max_z:.2} / {cmd_vel.angular.z:.2}')
         return cmd_vel
 
     def callback(self, tracked_pts: Point):
@@ -169,15 +171,23 @@ class Navigator:
         # print(f'X = y + obs_traj[-1, 0 ,0] = {tracked_pts.y:.2f} + {self.obs_traj[-1, 0, 0].item():.2f} = {tracked_pts.y + self.obs_traj[-1, 0, 0].item():.2f}m')
         # print(f'Y = -x + obs_traj[-1, 0 ,1] = {-tracked_pts.x:.2f} + {self.obs_traj[-1, 0, 1].item():.2f} = {-tracked_pts.x + self.obs_traj[-1, 0, 1].item():.2f}m')
         # # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
+        print(
+            f'Agent {int(tracked_pts.z)} tracked {time.perf_counter() - self.last_times[int(tracked_pts.z)]:.2f}s ago.')
+        if time.perf_counter() - self.last_times[int(tracked_pts.z)] < 0.4:
+
+            return
+
         # Slide selected agent's points fwd a timestep
         self.obs_traj[:-1, 1 + int(tracked_pts.z)] = self.obs_traj.clone()[1:, 1 + int(tracked_pts.z)]
         # # From agent 0 (Husky) to agent 9 update
         # # x and y coordinate from object tracker
         # # point.z value contains agent id no.
         # TODO flipping x and -y for now because of wrong axes from tracker
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = tracked_pts.x + self.obs_traj[0, 0, 0]
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = -tracked_pts.x
+                                                       # + self.obs_traj[0, 0, 0]
         # + self.obs_traj[-1, 0, 0].item()
-        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y + self.obs_traj[0, 0, 1]
+        self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
+                                                       # + self.obs_traj[0, 0, 1]
         # Check all values are same, if so most likely dead point from out of scene. Reset to 100
         # if np.all(self.obs_traj[::, int(tracked_pts.z), 0].numpy() ==
         #           self.obs_traj[0, int(tracked_pts.z), 0].item()) \
@@ -189,6 +199,7 @@ class Navigator:
         # # for i, pt in enumerate(tracked_pts):
         # #     self.obs_traj[-1, i, 0] = pt[0]
         # #     self.obs_traj[-1, i, 1] = pt[1]
+        self.last_times[int(tracked_pts.z)] = time.perf_counter()
         self.last_callback = time.perf_counter()
         self.callback_status = True
 
@@ -201,10 +212,11 @@ class Navigator:
         self.odom = odom.pose
         # self.husky_odom.append([self.odom.pose.position.x, self.odom.pose.position.y])
         # Slide husky points along by one
-        # self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
+        self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
         # Update latest observed pts with new odom x and y
-        # self.obs_traj[-1, 0, 0] = self.odom.pose.position.x
-        # self.obs_traj[-1, 0, 1] = self.odom.pose.position.y
+        #TODO adding x flip for network prediction issue
+        self.obs_traj[-1, 0, 0] = -self.odom.pose.position.x
+        self.obs_traj[-1, 0, 1] = self.odom.pose.position.y
         # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
         self.odom_callback_status = True
 
@@ -236,9 +248,6 @@ class Navigator:
                 # goal_state[0, agent_id, 0] = x
 
                 goal_state[0, agent_id, 0] = self.goal.x - self.obs_traj[-1, 0, 0].item()
-                # TODO remove need for flipping x
-                # goal_state[0, agent_id, 0] = -goal_state[0, agent_id, 0]
-                # goal_state[0, agent_id, 1] = y
                 goal_state[0, agent_id, 1] = self.goal.y - self.obs_traj[-1, 0, 1].item()
                 # print(f'X {self.goal.x:.2f}, Y {self.goal.y:.2f}')
                 # print(goal_state.shape)
@@ -251,20 +260,25 @@ class Navigator:
             #     print(self.obs_traj[::, 0:2, 1].T)
             # print(self.obs_traj[, 1].T)
             # TODO Resolve pred imbalance for now flip x - axis
-            obs_traj = self.obs_traj
+            # obs_traj = self.obs_traj
             # obs_traj[::, ::, 0] = -obs_traj[::, ::, 0]
-            obs_traj_rel = abs_to_relative(obs_traj)
-            pred_traj_fake_rel = self.generator(obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
-            self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
+            obs_traj_rel = abs_to_relative(self.obs_traj)
+            pred_traj_fake_rel = self.generator(self.obs_traj, obs_traj_rel, seq_start_end, goal_state, goal_aggro=0.5)
+            # self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
 
-            # pred_traj_fake_rel[::, ::, 0] = -pred_traj_fake_rel[::, ::, 0]
             # with np.printoptions(precision=2, suppress=True):
             #     print(f'Rel Pred Ped 0:\n{pred_traj_fake_rel[::, 1].T}')
             #     print(f'Abs Observed Ped 0:\n{self.obs_traj[::, 1].T}')
             #     print(f'Rel Observed Ped 0:\n{obs_traj_rel[::, 1].T}')
-            start_pos = obs_traj[-1]
+            start_pos = self.obs_traj[-1]
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
-            self.obs_traj[-1, 0] = ptfa[0, 0]
+            pred_traj_to_plot = ptfa.clone()
+            pred_traj_to_plot[::, ::, 0] = -pred_traj_to_plot[::, ::, 0]
+
+
+            # self.obs_traj[-1, 0] = ptfa[0, 0]
+            obs_traj_to_plot = self.obs_traj.clone()
+            obs_traj_to_plot[::, ::, 0] = -obs_traj_to_plot[::, ::, 0]
             with open(filename, 'a') as f:
                 p = ptfa.numpy()
                 f.write(f'{p[0, 0, 0]:.3f}\t{p[0, 0, 1]:.3f}\n')
@@ -273,12 +287,13 @@ class Navigator:
             # ptfa = relative_to_abs(pred_traj_fake_rel)
 
             # plot_trajectories(ota, ptga, ptfa, seq_start_end)
-            self.plotter.xlim = [self.obs_traj[-1, 0, 0] + -5, self.obs_traj[-1, 0, 0] + 5]
-            self.plotter.ylim = [self.obs_traj[-1, 0, 1] + -5, self.obs_traj[-1, 0, 1] + 5]
+            self.plotter.xlim = [obs_traj_to_plot[-1, 0, 0] + -5, obs_traj_to_plot[-1, 0, 0] + 5]
+            self.plotter.ylim = [obs_traj_to_plot[-1, 0, 1] + -5, obs_traj_to_plot[-1, 0, 1] + 5]
             # abs_goal = [goal_state[0, 0, 0] + self.obs_traj[-1, 0, 0], goal_state[0, 0, 1] + self.obs_traj[-1, 0, 1]]
             self.plotter.display(
                 title=f'\nRel Goal {goal_state[0, 0, 0].item():.2f}m {goal_state[0, 0, 1].item():.2f}m\n' \
-                      f'Abs Goal {self.abs_goal[0]:.2f}m {self.abs_goal[1]:.2f}m', ota=self.obs_traj, ptfa=ptfa,
+                      f'Abs Goal {self.abs_goal[0]:.2f}m {self.abs_goal[1]:.2f}m', ota=obs_traj_to_plot,
+                ptfa=pred_traj_to_plot,
                 goal_centre=self.abs_goal, sse=seq_start_end)
 
         # for i, ped in enumerate(self.obs_traj.permute(1, 0, 2)):
