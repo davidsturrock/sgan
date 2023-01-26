@@ -291,9 +291,9 @@ def pts_to_tfs(pred_traj_fake_rel):
         tf = np.eye(4)
         tf[0:3, 0:3] = rot
         # Assign x and y value respectively
-        # tf[2, 3] = xy[0, 0]
-        # tf[0, 3] = xy[0, 1]
-        tf[2, 3] = np.linalg.norm(xy)
+        tf[2, 3] = xy[0, 0]
+        tf[0, 3] = xy[0, 1]
+        # tf[2, 3] = np.linalg.norm(xy)
         tfs.append(tf)
         # print(f'Step {i}')
         # print(tf)

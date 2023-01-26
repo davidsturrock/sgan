@@ -68,7 +68,7 @@ def main(args):
         # if len(goal_tfs) < 8:
         pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}', filename=filename)
         goal_tfs = list(pts_to_tfs(pred_rel))
-        nav.goal_step(goal_tfs.pop(0))
+        nav.goal_step(goal_tfs.pop(-1))
         # nav.sleep()
         # with np.printoptions(precision=2, suppress=True):
         #     print(nav.obs_traj.T)

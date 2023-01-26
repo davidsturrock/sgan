@@ -13,7 +13,7 @@ sys.path.insert(0, '/usr/local/lib/python3.6/dist-packages/cv2/python-3.6')
 import numpy as np
 import rospy
 import std_msgs
-from geometry_msgs.msg import Twist, Point
+from geometry_msgs.msg import Twist, Point, Pose
 # import aru_py_logger
 from utilities.Transform import distance_and_yaw_from_transform
 # from aru_sil_py.utilities.Transform import distance_and_yaw_from_transform
@@ -94,7 +94,7 @@ class Navigator:
         self.ped_sub = rospy.Subscriber('/tracked/pedestrians', Point, self.callback)
         self.goal_sub = rospy.Subscriber('/goal', Point, self.goal_callback)
         # self.publisher: rospy.Publisher = rospy.Publisher(args.pub_topic, Twist, queue_size=1, latch=True)
-        self.publisher: rospy.Publisher = rospy.Publisher('/relay', Twist, queue_size=1, latch=True)
+        self.publisher: rospy.Publisher = rospy.Publisher('/pose', Pose, queue_size=1, latch=True)
 
     def sleep(self):
         self.rate.sleep()
@@ -102,33 +102,41 @@ class Navigator:
     def goal_step(self, tf):
         with np.printoptions(precision=2, suppress=True):
             # print(f'Initial TF:\n{tf}')
-            x = tf[2, 3]
-            # curr_x = self.odom.pose.position.x
-            # curr_y = self.odom.pose.position.y
-            rot_mat = R.from_matrix(tf[0:3, 0:3])
-            # turn_angle = math.atan2(curr_y, curr_x) * 180 / math.pi
-            tf_turn_angle = rot_mat.as_euler('zyx', degrees=True)[0]
-            # print(f"TF yaw {tf_turn_angle:.2f}")
-
-            quat = self.odom.pose.orientation
-            pose = R.from_quat([quat.x, quat.y, quat.z, quat.w])
-            curr_yaw = pose.as_euler('zyx', degrees=True)[0]
-            # print(f'Final turn angle: = {tf_turn_angle:.2f} - {curr_yaw:.2f} = {tf_turn_angle - curr_yaw:.2f}')
-            # # print(f'Turn angle for ({y - curr_y:.2f}, {x - curr_x:.2f}): {turn_angle:.2f} deg.')
-            turn_angle = curr_yaw - tf_turn_angle
-            r = R.from_euler('z', turn_angle, degrees=True)
-            rot = np.array(r.as_matrix())
-            tf = np.eye(4)
-            tf[0:3, 0:3] = rot
-            tf[2, 3] = x
+            # x = tf[2, 3]
+            # # curr_x = self.odom.pose.position.x
+            # # curr_y = self.odom.pose.position.y
+            # rot_mat = R.from_matrix(tf[0:3, 0:3])
+            # # turn_angle = math.atan2(curr_y, curr_x) * 180 / math.pi
+            # tf_turn_angle = rot_mat.as_euler('zyx', degrees=True)[0]
+            # # print(f"TF yaw {tf_turn_angle:.2f}")
+            #
+            # quat = self.odom.pose.orientation
+            # pose = R.from_quat([quat.x, quat.y, quat.z, quat.w])
+            # curr_yaw = pose.as_euler('zyx', degrees=True)[0]
+            # # print(f'Final turn angle: = {tf_turn_angle:.2f} - {curr_yaw:.2f} = {tf_turn_angle - curr_yaw:.2f}')
+            # # # print(f'Turn angle for ({y - curr_y:.2f}, {x - curr_x:.2f}): {turn_angle:.2f} deg.')
+            # turn_angle = curr_yaw - tf_turn_angle
+            # r = R.from_euler('z', turn_angle, degrees=True)
+            # rot = np.array(r.as_matrix())
+            # tf = np.eye(4)
+            # tf[0:3, 0:3] = rot
+            # tf[2, 3] = x
             # print(f'New TF:\n{tf}')
-            if x < self.control_params.dthresh and abs(turn_angle) < self.control_params.ythresh:
-                msg = self.controller(tf)
-                self.publisher.publish(msg)
-            if x > self.control_params.dthresh:
-                print(f'{x:.2f} > {self.control_params.dthresh}')
-            if abs(turn_angle) > self.control_params.ythresh:
-                  print(f'{abs(turn_angle):.2f} > {self.control_params.ythresh}')
+            pose = Pose()
+            pose_mat = R.from_matrix(tf[0:3, 0:3])
+            pose_quat = pose_mat.as_quat()
+            pose.orientation = pose_quat
+            pose.position.x = tf[2, 3]
+            pose.position.y = tf[0, 3]
+
+            self.publisher.publish(pose)
+            # if x < self.control_params.dthresh and abs(turn_angle) < self.control_params.ythresh:
+            #     msg = self.controller(tf)
+            #     self.publisher.publish(msg)
+            # if x > self.control_params.dthresh:
+            #     print(f'{x:.2f} > {self.control_params.dthresh}')
+            # if abs(turn_angle) > self.control_params.ythresh:
+            #       print(f'{abs(turn_angle):.2f} > {self.control_params.ythresh}')
 
     def controller(self, tf):
         """Controller now assumes TF is within bounds. Check must be performed at higher level"""
@@ -174,7 +182,6 @@ class Navigator:
         print(
             f'Agent {int(tracked_pts.z)} tracked {time.perf_counter() - self.last_times[int(tracked_pts.z)]:.2f}s ago.')
         if time.perf_counter() - self.last_times[int(tracked_pts.z)] < 0.4:
-
             return
 
         # Slide selected agent's points fwd a timestep
@@ -184,10 +191,10 @@ class Navigator:
         # # point.z value contains agent id no.
         # TODO flipping x and -y for now because of wrong axes from tracker
         self.obs_traj[-1, 1 + int(tracked_pts.z), 0] = -tracked_pts.x
-                                                       # + self.obs_traj[0, 0, 0]
+        # + self.obs_traj[0, 0, 0]
         # + self.obs_traj[-1, 0, 0].item()
         self.obs_traj[-1, 1 + int(tracked_pts.z), 1] = tracked_pts.y
-                                                       # + self.obs_traj[0, 0, 1]
+        # + self.obs_traj[0, 0, 1]
         # Check all values are same, if so most likely dead point from out of scene. Reset to 100
         # if np.all(self.obs_traj[::, int(tracked_pts.z), 0].numpy() ==
         #           self.obs_traj[0, int(tracked_pts.z), 0].item()) \
@@ -214,7 +221,7 @@ class Navigator:
         # Slide husky points along by one
         self.obs_traj[:-1, 0] = self.obs_traj.clone()[1:, 0]
         # Update latest observed pts with new odom x and y
-        #TODO adding x flip for network prediction issue
+        # TODO adding x flip for network prediction issue
         self.obs_traj[-1, 0, 0] = -self.odom.pose.position.x
         self.obs_traj[-1, 0, 1] = self.odom.pose.position.y
         # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
@@ -274,7 +281,6 @@ class Navigator:
             ptfa = relative_to_abs(pred_traj_fake_rel, start_pos=start_pos)
             pred_traj_to_plot = ptfa.clone()
             pred_traj_to_plot[::, ::, 0] = -pred_traj_to_plot[::, ::, 0]
-
 
             # self.obs_traj[-1, 0] = ptfa[0, 0]
             obs_traj_to_plot = self.obs_traj.clone()
