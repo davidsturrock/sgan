@@ -41,9 +41,6 @@ def main(args):
     tf1[2, 3] = 0.5
     tf1[0, 3] = 0.2
     tfs = [tf for _ in range(8)]
-    # obs_traj = make_scene(count, tf, tf1, tfs)
-    # nav.obs_traj = obs_traj
-    # nav.obs_traj = torch.zeros((8, 1, 2))
     print('Waiting for wheel odometry')
     while not nav.odom_callback_status:
         pass
@@ -59,9 +56,8 @@ def main(args):
     # sys.exit(0)
     goal_tfs = []
     accum_time = 0
-    filename = f'{time.time():.0f}_traj.txt'
-    # with open(filename, 'w') as f:
-    #     f.write('-'*60 + '\n')
+    # filename = f'{time.time():.0f}_traj.txt'
+
     while not rospy.is_shutdown():
         start = time.perf_counter()
         # x, y = (t.item() for t in obs_traj[-1, 0])

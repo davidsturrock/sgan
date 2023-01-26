@@ -288,9 +288,9 @@ class Navigator:
             # self.obs_traj[-1, 0] = ptfa[0, 0]
             obs_traj_to_plot = self.obs_traj.clone()
             obs_traj_to_plot[::, ::, 0] = -obs_traj_to_plot[::, ::, 0]
-            with open(filename, 'a') as f:
-                p = ptfa.numpy()
-                f.write(f'{p[0, 0, 0]:.3f}\t{p[0, 0, 1]:.3f}\n')
+            # with open(filename, 'a') as f:
+            #     p = ptfa.numpy()
+            #     f.write(f'{p[0, 0, 0]:.3f}\t{p[0, 0, 1]:.3f}\n')
 
             # print(ptfa[::,0].T)
             # ptfa = relative_to_abs(pred_traj_fake_rel)
