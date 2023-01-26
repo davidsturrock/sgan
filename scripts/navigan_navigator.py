@@ -123,11 +123,14 @@ class Navigator:
             # tf[2, 3] = x
             # print(f'New TF:\n{tf}')
             pose = Pose()
-            pose_mat = R.from_matrix(tf[0:3, 0:3])
-            pose_quat = pose_mat.as_quat()
-            pose.orientation = pose_quat
-            pose.position.x = tf[2, 3]
-            pose.position.y = tf[0, 3]
+            # pose_mat = R.from_matrix(tf[0:3, 0:3])
+            # pose_quat = pose_mat.as_quat()
+            # pose.orientation.x = pose_quat[0]
+            # pose.orientation.y = pose_quat[1]
+            # pose.orientation.z = pose_quat[2]
+            pose.orientation.w = 1
+            pose.position.x = -tf[0,0]
+            pose.position.y = tf[0,1]
 
             self.publisher.publish(pose)
             # if x < self.control_params.dthresh and abs(turn_angle) < self.control_params.ythresh:
@@ -179,8 +182,8 @@ class Navigator:
         # print(f'X = y + obs_traj[-1, 0 ,0] = {tracked_pts.y:.2f} + {self.obs_traj[-1, 0, 0].item():.2f} = {tracked_pts.y + self.obs_traj[-1, 0, 0].item():.2f}m')
         # print(f'Y = -x + obs_traj[-1, 0 ,1] = {-tracked_pts.x:.2f} + {self.obs_traj[-1, 0, 1].item():.2f} = {-tracked_pts.x + self.obs_traj[-1, 0, 1].item():.2f}m')
         # # print(f'Callback rate {1 / (time.perf_counter() - self.last_callback):.2f}Hz')
-        print(
-            f'Agent {int(tracked_pts.z)} tracked {time.perf_counter() - self.last_times[int(tracked_pts.z)]:.2f}s ago.')
+        # print(
+            # f'Agent {int(tracked_pts.z)} tracked {time.perf_counter() - self.last_times[int(tracked_pts.z)]:.2f}s ago.')
         if time.perf_counter() - self.last_times[int(tracked_pts.z)] < 0.4:
             return
 

@@ -67,12 +67,12 @@ def main(args):
         # x, y = (t.item() for t in obs_traj[-1, 0])
         # if len(goal_tfs) < 8:
         pred, pred_rel = nav.seek_live_goal(title=f'Jan_{count}', filename=filename)
-        goal_tfs = list(pts_to_tfs(pred_rel))
-        nav.goal_step(goal_tfs.pop(-1))
+        # goal_tfs = list(pts_to_tfs(pred_rel))
+        nav.goal_step(pred[11])
         # nav.sleep()
         # with np.printoptions(precision=2, suppress=True):
         #     print(nav.obs_traj.T)
-        # print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
+        print(f"Loop rate {1 / (time.perf_counter() - start):.2f}Hz")
         accum_time += time.perf_counter() - start
 
         if count == 5:

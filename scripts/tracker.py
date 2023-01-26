@@ -55,8 +55,8 @@ class Tracker:
     def odom_callback(self, odom: Odometry):
         """update_obs_traj when a new list msg of tracked pts are received from the object tracker"""
         # limit update rate to self.rate_value
-        # if 1 / (time.perf_counter() - self.odom_last_callback) > self.rate_value:
-        #     return
+        if 1 / (time.perf_counter() - self.odom_last_callback) > 2.5:
+            return
         self.odom = odom.pose
         # quat = self.odom.pose.orientation
         # pose = R.from_quat([quat.x, quat.y, quat.z, quat.w])
@@ -106,7 +106,7 @@ class Tracker:
                 # bring points in to increase sensitivity of network preds
                 x = tracks[agent_id, 1]
                 y = -tracks[agent_id, 0]
-                # x, y = pull_to_centre(x=tracks[agent_id, 1], y=-tracks[agent_id, 0], r_pull=r_pull, min_radius=min_radius)
+                x, y = pull_to_centre(x=x, y=y, r_pull=r_pull, min_radius=min_radius)
                 point_mat[:3, 3] = np.array([x, y, 0]).T
                 transformed_pts = self.tf @ point_mat
                 point = Point(transformed_pts[0, 3], transformed_pts[1, 3], agent_id)
